@@ -1,0 +1,616 @@
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
+import { Screen } from "../components/Screen";
+import { LanguageSwitch } from "../components/LanguageSwitch";
+import { BrandMark } from "../components/BrandMark";
+import { statusLabel } from "../components/orderStatus";
+import { useSession, useT } from "../context/Session";
+import { useArea } from "../context/Area";
+import { matchesArea } from "../server/places";
+import { api } from "../services/api";
+import { formatMoney } from "../services/money";
+import { saveTripProfile } from "../services/tripProfile";
+import { editUzPhone, formatUzPhone } from "../services/phoneMask";
+import { VEHICLE_LABEL } from "../server/rules";
+import type { BuilderCard, LiveJob, TripCard } from "../types";
+import { RegisterScreen } from "./RegisterScreen";
+import { SenderApp } from "./SenderHomeScreen";
+import { CourierHomeScreen } from "./CourierHomeScreen";
+import { IntercityScreen, TripEntry } from "./IntercityScreen";
+import { FoodScreen } from "../components/FoodBoard";
+import { BuildScreen } from "./BuildScreen";
+import { DeliveryEntry } from "./DeliveryEntry";
+
+type Gate = "sender" | "rider" | "driver" | "courier";
+type Feed = "all" | "jobs" | "food" | "trips" | "barber" | "builder";
+
+export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => void }) {
+  const t = useT();
+  const { account } = useSession();
+  const area = useArea();
+  const [gate, setGate] = useState<Gate | null>(null);
+  const [feed, setFeed] = useState<Feed>("all");
+  const [barberAsk, setBarberAsk] = useState(false);
+  const [jobs, setJobs] = useState<LiveJob[]>([]);
+  const [trips, setTrips] = useState<TripCard[]>([]);
+  const [builders, setBuilders] = useState<BuilderCard[]>([]);
+  const [boardWidth, setBoardWidth] = useState(0);
+  const [opened, setOpened] = useState<Record<string, { phone: string; address: string }>>({});
+  const [askId, setAskId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState(formatUzPhone(""));
+  const [error, setError] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [detail, setDetail] = useState<{ kind: "job" | "trip"; id: string } | null>(null);
+  const [tripDoor, setTripDoor] = useState<"gate" | "list">("gate");
+
+  const load = useCallback(async () => {
+    try {
+      const [nextJobs, nextTrips, nextBuilders] = await Promise.all([
+        api.listLiveJobs(),
+        api.listTrips({ mode: "route" }),
+        api.listBuilders(),
+      ]);
+      setJobs(nextJobs);
+      setTrips(nextTrips.slice(0, 20));
+      setBuilders(nextBuilders.slice(0, 20));
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t("fail.generic"));
+    } finally {
+      setBooting(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void load();
+    const timer = setInterval(() => void load(), 4000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  async function reveal(tripId: string, driverPhone: string) {
+    const revealed = await api.revealTripPhone(tripId, driverPhone);
+    if (revealed.ok) {
+      setOpened((prev) => ({ ...prev, [tripId]: { phone: revealed.phone, address: revealed.address } }));
+      setAskId(null);
+      setError(null);
+      return;
+    }
+    Alert.alert(t("trip.pass_title"), t("trip.pass_body", { days: revealed.days, money: formatMoney(revealed.price) }), [
+      { text: t("no"), style: "cancel" },
+      {
+        text: t("trip.pass_buy"),
+        onPress: () => {
+          void api.registerTripAccount("driver", name, driverPhone).then(async (account) => {
+            await saveTripProfile("driver", { id: account.id, name: account.name, phone: formatUzPhone(account.phone) });
+            await api.startTripPass(account.id);
+            await reveal(tripId, account.id);
+          }).catch((caught: unknown) => {
+            setError(caught instanceof Error ? caught.message : t("fail.generic"));
+          });
+        },
+      },
+    ]);
+  }
+
+  function submitDriver() {
+    if (!askId) return;
+    const digits = phone.replace(/\D/g, "");
+    if (name.trim().length < 2 || digits.length < 9) {
+      setError(t("city.driver_hint"));
+      return;
+    }
+    void api.registerTripAccount("driver", name.trim(), phone).then(async (account) => {
+      await saveTripProfile("driver", { id: account.id, name: account.name, phone: formatUzPhone(account.phone) });
+      await reveal(askId, account.id);
+    }).catch((caught: unknown) => {
+      setError(caught instanceof Error ? caught.message : t("fail.generic"));
+    });
+  }
+
+  function pickFeed(next: Exclude<Feed, "all">) {
+    setDetail(null);
+    if (feed === next) {
+      setFeed("all");
+      return;
+    }
+    if (next === "trips") setTripDoor("gate");
+    setFeed(next);
+  }
+
+  function openDetail(next: { kind: "job" | "trip"; id: string }) {
+    setAskId(null);
+    setError(null);
+    setDetail(next);
+  }
+
+  const localJobs = jobs.filter((job) => matchesArea(area.place, job.region, job.district));
+  const localBuilders = builders.filter((builder) => matchesArea(area.place, builder.region, builder.area));
+  const city = [
+    ...localJobs.map((job) => ({ kind: "job" as const, at: job.at, job })),
+    ...trips.map((trip) => ({ kind: "trip" as const, at: trip.at, trip })),
+    ...localBuilders.map((builder) => ({ kind: "builder" as const, at: builder.at, builder })),
+  ]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 20);
+  const tile = boardWidth > 0 ? Math.floor((boardWidth - 16) / 3) : 0;
+  const tileH = tile > 0 ? Math.round(tile * 0.92) : 0;
+  const pickedJob = detail?.kind === "job" ? jobs.find((job) => job.id === detail.id) ?? null : null;
+  const pickedTrip = detail?.kind === "trip" ? trips.find((trip) => trip.id === detail.id) ?? null : null;
+
+  useEffect(() => {
+    if (!detail) return;
+    const alive = detail.kind === "job" ? jobs.some((job) => job.id === detail.id) : trips.some((trip) => trip.id === detail.id);
+    if (!alive) setDetail(null);
+  }, [detail, jobs, trips]);
+
+  const nestedApp =
+    (gate === "sender" && account?.role === "sender") || (gate === "courier" && account?.role === "courier");
+
+  useEffect(() => {
+    onChrome?.(!nestedApp);
+  }, [nestedApp, onChrome]);
+
+  if (gate === "sender") {
+    if (account?.role === "sender") return <SenderApp onBack={() => setGate(null)} />;
+    return <RegisterScreen role="sender" onBack={() => setGate(null)} />;
+  }
+  if (gate === "courier") {
+    if (account?.role === "courier") return <CourierHomeScreen onBack={() => setGate(null)} />;
+    return <RegisterScreen role="courier" onBack={() => setGate(null)} />;
+  }
+  if (gate === "rider") {
+    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />;
+  }
+  if (gate === "driver") {
+    return <IntercityScreen start="driver" onBack={() => setGate(null)} />;
+  }
+  if (feed === "trips" && tripDoor === "gate") {
+    return (
+      <TripEntry
+        onBack={() => setFeed("all")}
+        onRider={() => setGate("rider")}
+        onDriver={() => setGate("driver")}
+      />
+    );
+  }
+  if (feed === "food") {
+    return <FoodScreen onBack={() => setFeed("all")} />;
+  }
+  if (feed === "builder") {
+    return <BuildScreen onBack={() => setFeed("all")} />;
+  }
+  if (feed === "jobs") {
+    return (
+      <DeliveryEntry
+        jobs={localJobs}
+        onBack={() => {
+          setDetail(null);
+          setFeed("all");
+        }}
+        onOrder={() => setGate("sender")}
+        onCourier={() => setGate("courier")}
+        onOpenJob={(id) => openDetail({ kind: "job", id })}
+      >
+        {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} onTake={() => setGate("courier")} /> : null}
+      </DeliveryEntry>
+    );
+  }
+
+  return (
+    <Screen ad={null} compact surface="bg-[#171717]">
+      <StatusBar style="light" />
+      <View className="px-5 pb-6 pt-1">
+        <View className="flex-row items-center">
+          <BrandMark size={52} />
+          <View className="ml-2.5 min-w-0 flex-1">
+            <Text className="text-xl font-bold text-white" numberOfLines={1}>
+              Express Go
+            </Text>
+            <Text className="text-xs font-semibold text-[#FF8A00]" numberOfLines={2}>
+              {t("welcome.slogan")}
+            </Text>
+          </View>
+          <View className="self-start">
+            <LanguageSwitch light compact />
+          </View>
+          <Ionicons name="notifications-outline" size={22} color="#FFFFFF" style={{ marginLeft: 8 }} />
+        </View>
+        <Pressable onPress={area.openPicker} accessibilityRole="button" className="mt-3 flex-row items-center self-start">
+          <Ionicons name="location" size={16} color="#FF8A00" />
+          <Text className="ml-1.5 text-sm font-semibold text-white">
+            {area.place ? t("area.here", { name: area.place.name, region: area.place.region }) : t("area.pick")}
+          </Text>
+        </Pressable>
+        {!area.place ? <Text className="mt-1 text-xs leading-4 text-[#A3A3A3]">{area.denied ? t("area.denied") : t("area.need")}</Text> : null}
+
+        <View
+          className="mt-3.5"
+          onLayout={(event) => {
+            const next = Math.floor(event.nativeEvent.layout.width);
+            setBoardWidth((prev) => (prev === next ? prev : next));
+          }}
+        >
+          {tile > 0 ? (
+            <>
+              <View className="flex-row" style={{ gap: 8 }}>
+                <ServiceTile art={homeArt.scooter} label={t("city.tile_delivery")} width={tile} height={tileH} onPress={() => pickFeed("jobs")} />
+                <ServiceTile art={homeArt.food} label={t("home.food")} width={tile} height={tileH} onPress={() => pickFeed("food")} />
+                <ServiceTile art={homeArt.bus} label={t("city.tile_trip")} width={tile} height={tileH} onPress={() => pickFeed("trips")} />
+              </View>
+              <View className="mt-2 flex-row" style={{ gap: 8 }}>
+                <ServiceTile art={homeArt.build} label={t("city.tile_builder")} width={tile} height={tileH} onPress={() => pickFeed("builder")} />
+                <ServiceTile
+                  art={homeArt.barber}
+                  label={t("city.tile_barber")}
+                  width={tile * 2 + 8}
+                  height={tileH}
+                  wide
+                  onPress={() => pickFeed("barber")}
+                />
+              </View>
+            </>
+          ) : null}
+        </View>
+
+        {pickedJob ? (
+          <JobSheet job={pickedJob} onClose={() => setDetail(null)} onTake={() => setGate("courier")} />
+        ) : pickedTrip ? (
+          <TripSheet
+            trip={pickedTrip}
+            phoneShown={opened[pickedTrip.id]?.phone ?? null}
+            addressShown={opened[pickedTrip.id]?.address ?? null}
+            asking={askId === pickedTrip.id}
+            name={name}
+            phone={phone}
+            onName={setName}
+            onPhone={(value) => setPhone((prev) => editUzPhone(value, prev))}
+            onClose={() => {
+              setAskId(null);
+              setDetail(null);
+            }}
+            onTake={() => {
+              setError(null);
+              setAskId(pickedTrip.id);
+            }}
+            onSubmit={submitDriver}
+          />
+        ) : feed === "all" ? (
+          <>
+            <View className="mt-5 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-white">{t("trip.live")}</Text>
+              <Text className="text-sm font-semibold text-[#FF8A00]">{t("home.see_all")} →</Text>
+            </View>
+            {booting && city.length === 0 ? (
+              <View className="mt-6 items-center">
+                <ActivityIndicator color="#FF8A00" />
+              </View>
+            ) : city.length === 0 ? (
+              <View className="mt-3 items-center rounded-3xl bg-[#242424] px-5 py-8">
+                <Ionicons name="megaphone-outline" size={28} color="#FF8A00" />
+                <Text className="mt-3 text-center text-base font-semibold text-white">{t("city.all_empty")}</Text>
+                <Text className="mt-1 text-center text-sm leading-5 text-[#A3A3A3]">{t("city.all_hint")}</Text>
+              </View>
+            ) : (
+              city.map((card) =>
+                card.kind === "job" ? (
+                  <HomeAd
+                    key={`job-${card.job.id}`}
+                    art={homeArt.scooter}
+                    kicker={t("city.tile_delivery")}
+                    title={`${card.job.pickup} → ${card.job.dropoff}`}
+                    body={`${card.job.item} · ${VEHICLE_LABEL[card.job.vehicle]}`}
+                    place={card.job.pickup}
+                    money={formatMoney(card.job.deliveryFee)}
+                    onPress={() => openDetail({ kind: "job", id: card.job.id })}
+                  />
+                ) : card.kind === "trip" ? (
+                  <HomeAd
+                    key={`trip-${card.trip.id}`}
+                    art={homeArt.bus}
+                    kicker={t("city.tile_trip")}
+                    title={`${card.trip.from} → ${card.trip.to}`}
+                    body={`${card.trip.whenLabel} · ${t("trip.seats")}: ${card.trip.seats}`}
+                    place={card.trip.from}
+                    money={formatMoney(card.trip.price)}
+                    onPress={() => openDetail({ kind: "trip", id: card.trip.id })}
+                  />
+                ) : (
+                  <HomeAd
+                    key={`builder-${card.builder.id}`}
+                    art={homeArt.build}
+                    kicker={t("city.tile_builder")}
+                    title={tradeName(t, card.builder.trade) || card.builder.name}
+                    body={card.builder.text}
+                    place={[card.builder.region, card.builder.area].filter(Boolean).join(", ")}
+                    money={builderMoney(t, card.builder)}
+                    onPress={() => pickFeed("builder")}
+                  />
+                ),
+              )
+            )}
+          </>
+        ) : feed === "barber" ? (
+          <>
+            <Pressable
+              onPress={() => setBarberAsk(true)}
+              accessibilityRole="button"
+              className="mt-5 items-center rounded-full bg-[#1047C4] py-3.5 active:opacity-90"
+            >
+              <Text className="text-base font-bold text-white">{t("city.barber_book")}</Text>
+            </Pressable>
+            <View className="mt-3 rounded-3xl bg-white px-5 py-6">
+              <Text className="text-base font-semibold text-ink">{barberAsk ? t("city.food_empty") : t("city.barber_empty")}</Text>
+              {barberAsk ? null : <Text className="mt-2 text-sm text-muted">{t("city.barber_hint")}</Text>}
+            </View>
+          </>
+        ) : (
+          <>
+            <Pressable onPress={() => setTripDoor("gate")} accessibilityRole="button" className="mt-4 flex-row items-center self-start">
+              <Ionicons name="chevron-back" size={18} color="#C2410C" />
+              <Text className="ml-1 text-sm font-semibold text-[#C2410C]">{t("trip.back")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setGate("rider")}
+              accessibilityRole="button"
+              className="mt-3 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90"
+            >
+              <Text className="text-base font-bold text-white">{t("city.rider")}</Text>
+            </Pressable>
+            {trips.length === 0 ? (
+              <View className="mt-3 rounded-3xl bg-white px-5 py-6">
+                <Text className="text-base font-semibold text-ink">{t("city.trips_empty")}</Text>
+              </View>
+            ) : (
+              trips.map((trip) => (
+                <Pressable
+                  key={trip.id}
+                  onPress={() => openDetail({ kind: "trip", id: trip.id })}
+                  accessibilityRole="button"
+                  className="mt-3 rounded-3xl bg-[#FFF1E6] px-4 py-2.5 active:opacity-90"
+                >
+                  <Text className="text-base font-semibold text-ink">
+                    {trip.from} → {trip.to}
+                  </Text>
+                  <Text className="mt-1 text-sm text-muted">{trip.whenLabel}</Text>
+                  <Text className="mt-1 text-lg font-bold text-[#C2410C]">
+                    {t("trip.seats")}: {trip.seats}
+                  </Text>
+                  <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{formatMoney(trip.price)}</Text>
+                  <Text className="mt-2 text-base font-semibold text-brand">{opened[trip.id]?.phone ?? trip.phoneMasked}</Text>
+                </Pressable>
+              ))
+            )}
+          </>
+        )}
+
+        {error ? <Text className="mt-2 text-sm text-[#F04438]">{error}</Text> : null}
+      </View>
+    </Screen>
+  );
+}
+
+function JobSheet({ job, onClose, onTake }: { job: LiveJob; onClose: () => void; onTake: () => void }) {
+  const t = useT();
+  return (
+    <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xs font-semibold text-[#FF8A00]">
+          {t("city.tile_delivery")} · {statusLabel[job.status]}
+        </Text>
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("close")}>
+          <Text className="text-sm font-semibold text-[#A3A3A3]">{t("close")}</Text>
+        </Pressable>
+      </View>
+      <Text className="mt-3 text-xl font-bold text-white">{job.item}</Text>
+      <DetailLine label={t("sheet.pickup")} value={job.pickup} />
+      <DetailLine label={t("sheet.drop")} value={job.dropoff} />
+      <DetailLine label={t("auth.vehicle")} value={VEHICLE_LABEL[job.vehicle]} />
+      {job.status === "posted" ? (
+        <Pressable onPress={onTake} accessibilityRole="button" className="mt-4 items-center rounded-full bg-[#012668] py-3.5 active:opacity-90">
+          <Text className="text-base font-bold text-white">{t("city.take")}</Text>
+        </Pressable>
+      ) : null}
+      <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{formatMoney(job.deliveryFee)}</Text>
+    </View>
+  );
+}
+
+function TripSheet({
+  trip,
+  phoneShown,
+  addressShown,
+  asking,
+  name,
+  phone,
+  onName,
+  onPhone,
+  onClose,
+  onTake,
+  onSubmit,
+}: {
+  trip: TripCard;
+  phoneShown: string | null;
+  addressShown: string | null;
+  asking: boolean;
+  name: string;
+  phone: string;
+  onName: (value: string) => void;
+  onPhone: (value: string) => void;
+  onClose: () => void;
+  onTake: () => void;
+  onSubmit: () => void;
+}) {
+  const t = useT();
+  return (
+    <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xs font-semibold text-[#FF8A00]">{t("city.tile_trip")}</Text>
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("close")}>
+          <Text className="text-sm font-semibold text-[#A3A3A3]">{t("close")}</Text>
+        </Pressable>
+      </View>
+      <Text className="mt-3 text-xl font-bold text-white">
+        {trip.from} → {trip.to}
+      </Text>
+      <DetailLine label={t("trip.when")} value={trip.whenLabel} />
+      <Text className="mt-3 text-lg font-bold text-[#FF8A00]">
+        {t("trip.seats")}: {trip.seats}
+      </Text>
+      {addressShown ? <Text className="mt-2 text-sm text-muted">{addressShown}</Text> : null}
+      {phoneShown ? <Text className="mt-3 text-base font-semibold text-brand">{phoneShown}</Text> : null}
+      {!phoneShown && asking ? (
+        <>
+          <Text className="mt-4 text-base font-semibold text-white">{t("city.driver_title")}</Text>
+          <Text className="mt-1 text-sm text-[#A3A3A3]">{t("city.driver_hint")}</Text>
+          <TextInput
+            value={name}
+            onChangeText={onName}
+            placeholder={t("auth.name_ph")}
+            placeholderTextColor="#98A2B3"
+            className="mt-3 rounded-2xl border border-line bg-canvas px-4 py-3 text-base text-ink"
+          />
+          <TextInput
+            value={phone}
+            onChangeText={onPhone}
+            placeholder="+998"
+            placeholderTextColor="#98A2B3"
+            keyboardType="phone-pad"
+            className="mt-2 rounded-2xl border border-line bg-canvas px-4 py-3 text-base text-ink"
+          />
+          <Pressable onPress={onSubmit} accessibilityRole="button" className="mt-3 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90">
+            <Text className="text-base font-bold text-white">{t("otp.ok")}</Text>
+          </Pressable>
+        </>
+      ) : null}
+      {!phoneShown && !asking ? (
+        <Pressable onPress={onTake} accessibilityRole="button" className="mt-4 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90">
+          <Text className="text-base font-bold text-white">{t("city.take")}</Text>
+        </Pressable>
+      ) : null}
+      <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{formatMoney(trip.price)}</Text>
+    </View>
+  );
+}
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="mt-3">
+      <Text className="text-xs font-semibold text-[#A3A3A3]">{label}</Text>
+      <Text className="mt-0.5 text-base font-semibold text-white">{value}</Text>
+    </View>
+  );
+}
+
+function tradeName(t: (key: string) => string, trade: string): string {
+  if (!trade) return "";
+  const key = `build.t.${trade}`;
+  const label = t(key);
+  return label === key ? trade : label;
+}
+
+function builderMoney(t: (key: string) => string, card: BuilderCard): string {
+  if (card.payKind === "deal") return t("build.pay_deal");
+  return card.price != null ? formatMoney(card.price) : "";
+}
+
+const homeArt = {
+  scooter: require("../../assets/home/scooter.jpg"),
+  food: require("../../assets/home/food.jpg"),
+  bus: require("../../assets/home/bus.jpg"),
+  build: require("../../assets/home/build.jpg"),
+  barber: require("../../assets/home/barber.jpg"),
+};
+
+function HomeAd({
+  art,
+  kicker,
+  title,
+  body,
+  place,
+  money,
+  onPress,
+}: {
+  art: number;
+  kicker: string;
+  title: string;
+  body: string;
+  place: string;
+  money: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="mt-2.5 flex-row items-center rounded-[18px] bg-[#242424] p-2.5 active:opacity-90"
+    >
+      <Image source={art} style={{ width: 62, height: 62, borderRadius: 14 }} resizeMode="cover" />
+      <View className="ml-3 min-w-0 flex-1">
+        <Text className="text-xs font-semibold text-[#FF8A00]" numberOfLines={1}>
+          {kicker}
+        </Text>
+        <Text className="mt-0.5 text-[15px] font-bold text-white" numberOfLines={1}>
+          {title}
+        </Text>
+        {body ? (
+          <Text className="mt-0.5 text-xs leading-4 text-[#A3A3A3]" numberOfLines={2}>
+            {body}
+          </Text>
+        ) : null}
+        {place ? (
+          <View className="mt-1 flex-row items-center">
+            <Ionicons name="location" size={12} color="#FF8A00" />
+            <Text className="ml-1 flex-1 text-xs text-[#D0D0D0]" numberOfLines={1}>
+              {place}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View className="ml-2 items-end">
+        {money ? <Text className="text-sm font-bold text-white">{money}</Text> : null}
+        <Ionicons name="chevron-forward" size={16} color="#8A8A8A" style={{ marginTop: 6 }} />
+      </View>
+    </Pressable>
+  );
+}
+
+function ServiceTile({
+  art,
+  label,
+  width,
+  height,
+  wide = false,
+  onPress,
+}: {
+  art: number;
+  label: string;
+  width: number;
+  height: number;
+  wide?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{ width, height }}
+      className="overflow-hidden rounded-[18px] active:opacity-90"
+    >
+      <Image source={art} style={{ width, height }} resizeMode="cover" />
+      <View className="absolute inset-x-0 bottom-0 px-2 pb-2.5">
+        <Text
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          className={`text-center font-bold text-white ${wide ? "text-[15px]" : "text-xs"}`}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}

@@ -1,0 +1,317 @@
+import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import type { Actor } from "./actorContext";
+import { createRpcServer } from "./rpcHttp";
+import { createFileDeliveryRepository } from "./deliveryRepo";
+import {
+  acceptDelivery,
+  adminBoard,
+  cancelDelivery,
+  createDeliveryOrder,
+  creditAsAdmin,
+  deliverDelivery,
+  deliveryDatabaseStatus,
+  listMine,
+  pickupDelivery,
+  registerAccount,
+  requestLogin,
+  reviewDoc,
+  pingCourier,
+  savePushToken,
+  setCourierShift,
+  submitDoc,
+  useDeliveryRepository,
+  verifyLogin,
+} from "./deliveryService";
+import { setExpoPushSender } from "./expoPush";
+import { readDevOtp } from "./sms";
+import { assertOnline, postRpc } from "../services/rpcCall";
+import type { Account, AuthSession } from "../types";
+
+const previousOtp = process.env.EG_OTP_DEV;
+const previousAdmin = process.env.EG_ADMIN_PHONES;
+const previousSms = process.env.SMS_WEBHOOK_URL;
+process.env.EG_OTP_DEV = "1";
+process.env.EG_ADMIN_PHONES = "";
+delete process.env.SMS_WEBHOOK_URL;
+
+function actorOf(account: Account): Actor {
+  return {
+    id: account.id,
+    role: account.role,
+    phone: account.phone,
+    name: account.name,
+    isAdmin: account.isAdmin,
+  };
+}
+
+function useTempRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "expressgo-delivery-"));
+  const repo = createFileDeliveryRepository(join(dir, "delivery.json"));
+  useDeliveryRepository(repo, false);
+  return repo;
+}
+
+async function signIn(role: "sender" | "courier", phone: string, name: string, vehicle?: "walk"): Promise<AuthSession> {
+  await registerAccount({ role, name, phone, vehicle, deposit: 900000 });
+  await requestLogin({ role, phone });
+  const code = readDevOtp(phone);
+  assert.ok(code);
+  const session = await verifyLogin({ role, phone, code: code ?? "" });
+  assert.equal(Object.hasOwn(session, "code"), false);
+  return session;
+}
+
+test.after(() => {
+  process.env.EG_OTP_DEV = previousOtp;
+  process.env.EG_ADMIN_PHONES = previousAdmin;
+  if (previousSms === undefined) delete process.env.SMS_WEBHOOK_URL;
+  else process.env.SMS_WEBHOOK_URL = previousSms;
+  useDeliveryRepository(null, false);
+});
+
+test("yetkazib berish bazasi ulanmagan deb qoladi, toki DATABASE_URL tekshirilmaguncha", () => {
+  useDeliveryRepository(null, false);
+  const status = deliveryDatabaseStatus();
+  assert.equal(status.ready, false);
+  assert.match(status.reason, /DATABASE_URL/);
+});
+
+test("ochiq supabase siyosati qolmagan va yetkazish jadvali anonimga yopiq", () => {
+  const retired = readFileSync(new URL("../../supabase/expressgo.sql", import.meta.url), "utf8");
+  const delivery = readFileSync(new URL("../../supabase/eg_delivery.sql", import.meta.url), "utf8");
+  const claim = readFileSync(new URL("./deliveryPg.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(retired, /using\s*\(\s*true\s*\)/i);
+  assert.match(retired, /revoke all on table public\.eg_orders from anon/);
+  assert.doesNotMatch(delivery, /using\s*\(\s*true\s*\)/i);
+  assert.match(delivery, /revoke all on table public\.eg_delivery_orders from anon/);
+  assert.match(delivery, /force row level security/);
+  assert.match(claim, /status = 'posted' and courier_id is null/);
+});
+
+test("mijoz buyurtma yaratadi va ikkinchi mijoz uni ko'ra olmaydi", async () => {
+  useTempRepo();
+  const first = await signIn("sender", "998900000001", "Ali");
+  const second = await signIn("sender", "998900000002", "Vali");
+  const order = await createDeliveryOrder(actorOf(first.account), {
+    senderId: second.account.id,
+    pickup: "Shahrixon markaz",
+    dropoff: "Bozor",
+    item: "Hujjat",
+    customerPhone: "998900000009",
+    vehicle: "walk",
+    deliveryFee: 1,
+  });
+  assert.match(order.id, /^PX-/);
+  const mine = await listMine(actorOf(first.account));
+  const other = await listMine(actorOf(second.account));
+  assert.equal(mine.some((item) => item.id === order.id), true);
+  assert.equal(other.some((item) => item.id === order.id), false);
+  assert.ok(order.deliveryFee >= 8000);
+});
+
+test("ro'yxatdan o'tish kuryer egizagi va depozit yaratmaydi", async () => {
+  const repo = useTempRepo();
+  const account = await registerAccount({
+    role: "sender",
+    name: "Ali",
+    phone: "998900000003",
+    deposit: 500000,
+  });
+  assert.equal(account.role, "sender");
+  assert.equal(account.balance, null);
+  assert.equal(account.isAdmin, false);
+  assert.equal(await repo.readUserByPhone("998900000003", "courier"), null);
+  const courier = await registerAccount({
+    role: "courier",
+    name: "Ali",
+    phone: "998900000003",
+    vehicle: "walk",
+    deposit: 500000,
+  });
+  assert.equal(courier.balance, 0);
+});
+
+test("SMS sozlanmasa kirish kodi chiqmaydi", async () => {
+  useTempRepo();
+  await registerAccount({ role: "sender", name: "Ali", phone: "998900000004" });
+  process.env.EG_OTP_DEV = "";
+  delete process.env.SMS_WEBHOOK_URL;
+  try {
+    await assert.rejects(() => requestLogin({ role: "sender", phone: "998900000004" }), /SMS sozlanmagan/);
+    assert.equal(readDevOtp("998900000004"), null);
+  } finally {
+    process.env.EG_OTP_DEV = "1";
+  }
+});
+
+test("vakolatsiz foydalanuvchi admin amalini bajara olmaydi", async () => {
+  useTempRepo();
+  const sender = await signIn("sender", "998900000011", "Ali");
+  const courier = await signIn("courier", "998900000012", "Karim", "walk");
+  await assert.rejects(() => creditAsAdmin(actorOf(sender.account), courier.account.id, 10000), /administrator/i);
+  await assert.rejects(() => adminBoard(actorOf(sender.account)), /administrator/i);
+  await assert.rejects(() => reviewDoc(actorOf(sender.account), courier.account.id, "passport", true), /administrator/i);
+});
+
+test("kuryer buyurtmani qabul qiladi, ikkinchisi egallay olmaydi va noto'g'ri holat rad etiladi", async () => {
+  const repo = useTempRepo();
+  const sender = await signIn("sender", "998900000021", "Ali");
+  const first = await signIn("courier", "998900000022", "Karim", "walk");
+  const second = await signIn("courier", "998900000023", "Sobir", "walk");
+  const admin = await signIn("sender", "998900000024", "Admin");
+  const adminUser = await repo.readUser(admin.account.id);
+  assert.ok(adminUser);
+  adminUser.isAdmin = true;
+  await repo.writeUser(adminUser);
+  const adminActor = { ...actorOf(admin.account), isAdmin: true };
+  for (const courier of [first.account, second.account]) {
+    await submitDoc(actorOf(courier), "passport", "file://passport");
+    await reviewDoc(adminActor, courier.id, "passport", true);
+    await creditAsAdmin(adminActor, courier.id, 20000);
+    const fresh = await repo.readUser(courier.id);
+    assert.ok(fresh);
+    await setCourierShift({ ...actorOf(courier), ...{ id: fresh.id } }, true);
+  }
+  const order = await createDeliveryOrder(actorOf(sender.account), {
+    pickup: "Shahrixon markaz",
+    dropoff: "Bozor",
+    item: "Hujjat",
+    customerPhone: "998900000029",
+    vehicle: "walk",
+  });
+  await assert.rejects(() => deliverDelivery(actorOf(first.account), order.id));
+  const [one, two] = await Promise.allSettled([
+    acceptDelivery(actorOf(first.account), order.id),
+    acceptDelivery(actorOf(second.account), order.id),
+  ]);
+  const won = [one, two].filter((item) => item.status === "fulfilled");
+  assert.equal(won.length, 1);
+  const saved = await repo.readOrder(order.id);
+  assert.ok(saved?.courierId);
+  const winner = saved.courierId === first.account.id ? first.account : second.account;
+  assert.equal(saved.acceptedAt != null, true);
+  await pickupDelivery(actorOf(winner), order.id);
+  const picked = await repo.readOrder(order.id);
+  assert.equal(picked?.status, "picked_up");
+  assert.equal(picked?.pickedUpAt != null, true);
+  const delivered = await deliverDelivery(actorOf(winner), order.id);
+  assert.equal(delivered.active, null);
+  assert.equal(delivered.completed[0]?.status, "delivered");
+  assert.equal(delivered.completed[0]?.deliveredAt != null, true);
+  await assert.rejects(() => cancelDelivery(actorOf(sender.account), order.id), /olingan|bekor/i);
+});
+
+test("server yopilib ochilsa buyurtma omborda qoladi", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "expressgo-restart-"));
+  const file = join(dir, "delivery.json");
+  useDeliveryRepository(createFileDeliveryRepository(file), false);
+  const sender = await signIn("sender", "998900000031", "Ali");
+  const order = await createDeliveryOrder(actorOf(sender.account), {
+    pickup: "Shahrixon markaz",
+    dropoff: "Bozor",
+    item: "Hujjat",
+    customerPhone: "998900000039",
+    vehicle: "walk",
+  });
+  useDeliveryRepository(null, false);
+  useDeliveryRepository(createFileDeliveryRepository(file), false);
+  const mine = await listMine(actorOf(sender.account));
+  assert.equal(mine.some((item) => item.id === order.id), true);
+});
+
+test("server ishlamasa buyurtma muvaffaqiyatli deb belgilanmaydi", async () => {
+  let done = false;
+  assert.throws(() => assertOnline("", "Yetkazib berish serveri ulanmagan. Buyurtma saqlanmadi."), /saqlanmadi/);
+  assert.equal(done, false);
+  await assert.rejects(
+    postRpc("http://127.0.0.1:9", "createOrder", [{}], "", "Yetkazib berish serveri ulanmagan. Buyurtma saqlanmadi."),
+    /saqlanmadi/,
+  );
+  const server = createRpcServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  try {
+    await assert.rejects(
+      postRpc(`http://127.0.0.1:${address.port}`, "createOrder", [{}], "", "ulanmadi"),
+      /Sessiya yo'q|ulanmagan|saqlanmadi/,
+    );
+    assert.equal(done, false);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("smenasi ochiq kuryerga yopiq ilova xabari boradi", async () => {
+  const repo = useTempRepo();
+  const sent: { to: string; title: string }[] = [];
+  setExpoPushSender(async (items) => {
+    sent.push(...items);
+  });
+  try {
+    const sender = await signIn("sender", "998900000051", "Ali");
+    const on = await signIn("courier", "998900000052", "Karim", "walk");
+    const off = await signIn("courier", "998900000053", "Sobir", "walk");
+    const admin = await signIn("sender", "998900000054", "Admin");
+    const adminUser = await repo.readUser(admin.account.id);
+    assert.ok(adminUser);
+    adminUser.isAdmin = true;
+    await repo.writeUser(adminUser);
+    const adminActor = { ...actorOf(admin.account), isAdmin: true };
+    for (const courier of [on.account, off.account]) {
+      await submitDoc(actorOf(courier), "passport", "file://passport");
+      await reviewDoc(adminActor, courier.id, "passport", true);
+      await creditAsAdmin(adminActor, courier.id, 20000);
+    }
+    await setCourierShift(actorOf(on.account), true);
+    await savePushToken(actorOf(on.account), "ExponentPushToken[on]");
+    await savePushToken(actorOf(off.account), "ExponentPushToken[off]");
+    await savePushToken(actorOf(sender.account), "ExponentPushToken[sender]");
+    await pingCourier(actorOf(on.account), 40.71, 71.06);
+    sent.length = 0;
+    const order = await createDeliveryOrder(actorOf(sender.account), {
+      pickup: "Shahrixon markaz",
+      dropoff: "Bozor",
+      item: "Hujjat",
+      customerPhone: "998900000059",
+      vehicle: "walk",
+      pickupLat: 40.71,
+      pickupLng: 71.06,
+      deliveryFee: 1,
+    });
+    assert.equal(sent.some((item) => item.to === "ExponentPushToken[on]" && item.title === "Sizga taklif"), true);
+    assert.equal(sent.some((item) => item.to === "ExponentPushToken[off]"), false);
+    sent.length = 0;
+    await acceptDelivery(actorOf(on.account), order.id);
+    assert.equal(sent.some((item) => item.to === "ExponentPushToken[sender]" && item.title === "Kuryer qabul qildi"), true);
+  } finally {
+    setExpoPushSender(null);
+  }
+});
+
+test("sinov hisobi HTTP orqali ham ochilmaydi", async () => {
+  useDeliveryRepository(null, false);
+  const server = createRpcServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  try {
+    await assert.rejects(
+      postRpc(
+        `http://127.0.0.1:${address.port}`,
+        "ensureDemoPair",
+        [{ name: "Ali", phone: "998900000041" }],
+        "",
+        "xato",
+      ),
+      /Sessiya yo'q|o'chirilgan/,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});

@@ -1,0 +1,177 @@
+import { requireActor } from "./actorContext";
+import * as delivery from "./deliveryService";
+import * as store from "./store";
+
+function me(): string {
+  return requireActor().id;
+}
+
+export const RPC = {
+  getPricing: () => store.getPricing(),
+  quoteFee: (input: Parameters<typeof store.quoteFee>[0]) => store.quoteFee(input),
+  register: (input: Parameters<typeof delivery.registerAccount>[0]) => delivery.registerAccount(input),
+  login: (input: Parameters<typeof delivery.requestLogin>[0]) => delivery.requestLogin(input),
+  requestOtp: (input: Parameters<typeof delivery.requestLogin>[0]) => delivery.requestLogin(input),
+  verifyOtp: (input: Parameters<typeof delivery.verifyLogin>[0]) => delivery.verifyLogin(input),
+  ensureDemoPair: () => {
+    throw new Error("Sinov hisobi o'chirilgan.");
+  },
+  getAccount: (_userId?: string) => delivery.accountOf(requireActor()),
+  updateProfile: (_userId: string, input: Parameters<typeof store.updateProfile>[1]) => store.updateProfile(me(), input),
+  setPushToken: (_userId: string, token: string) => delivery.savePushToken(requireActor(), token),
+  listInbox: (_userId: string) => store.listInbox(me()),
+  markInboxRead: (_userId: string, noteId?: string | null) => store.markInboxRead(me(), noteId),
+  listChat: (_userId: string, jobId: string, kind: Parameters<typeof store.listChat>[2]) => store.listChat(me(), jobId, kind),
+  sendChat: (_userId: string, jobId: string, kind: Parameters<typeof store.sendChat>[2], text: string) =>
+    store.sendChat(me(), jobId, kind, text),
+  canChat: (_userId: string, jobId: string, kind: Parameters<typeof store.canChat>[2]) => store.canChat(me(), jobId, kind),
+  listChatThreads: (_userId: string) => store.listChatThreads(me()),
+  getSavedPlaces: (_userId?: string | null) => store.getSavedPlaces(me()),
+  savePlace: (input: Parameters<typeof store.savePlace>[0]) => store.savePlace({ ...input, userId: me() }),
+  clearPlace: (input: Parameters<typeof store.clearPlace>[0]) => store.clearPlace({ ...input, userId: me() }),
+  creditCourier: (courierId: string, amount: number) => delivery.creditAsAdmin(requireActor(), courierId, amount),
+  topUp: () => {
+    throw new Error("Depozitni faqat administrator kiritadi.");
+  },
+  getKassa: (_courierId: string) => delivery.kassaOf(requireActor()),
+  cashout: () => {
+    throw new Error("Chiqarish hali ulanmagan.");
+  },
+  setCourierVehicle: (_courierId: string, vehicle: Parameters<typeof store.setCourierVehicle>[1]) =>
+    store.setCourierVehicle(me(), vehicle),
+  setShift: (_courierId: string, on: boolean) => delivery.setCourierShift(requireActor(), on),
+  submitCourierDoc: (_courierId: string, kind: Parameters<typeof delivery.submitDoc>[1], uri: string) =>
+    delivery.submitDoc(requireActor(), kind, uri),
+  reviewCourierDoc: (
+    courierId: string,
+    kind: Parameters<typeof delivery.reviewDoc>[2],
+    ok: boolean,
+    note?: string | null,
+  ) => delivery.reviewDoc(requireActor(), courierId, kind, ok, note),
+  createOrder: (input: Parameters<typeof delivery.createDeliveryOrder>[1]) =>
+    delivery.createDeliveryOrder(requireActor(), input),
+  updateOrder: (_senderId: string, orderId: string, input: Parameters<typeof delivery.updateDelivery>[2]) =>
+    delivery.updateDelivery(requireActor(), orderId, input),
+  listSenderOrders: (_senderId: string) => delivery.listMine(requireActor()),
+  listLiveJobs: () => delivery.liveJobs(),
+  cancelOrder: (_senderId: string, orderId: string) => delivery.cancelDelivery(requireActor(), orderId),
+  getCourierBoard: (_courierId: string) => delivery.courierBoard(requireActor()),
+  pingLocation: (_courierId: string, lat: number, lng: number) => delivery.pingCourier(requireActor(), lat, lng),
+  acceptOrder: (_courierId: string, orderId: string) => delivery.acceptDelivery(requireActor(), orderId),
+  declineOrder: (_courierId: string, orderId: string) => delivery.declineDelivery(requireActor(), orderId),
+  markPickedUp: (_courierId: string, orderId: string, _photo: string) => delivery.pickupDelivery(requireActor(), orderId),
+  markDelivered: (_courierId: string, orderId: string, _photo: string, _signature?: string | null) =>
+    delivery.deliverDelivery(requireActor(), orderId),
+  markArrived: (_courierId: string, jobId: string) => delivery.arriveDelivery(requireActor(), jobId),
+  releaseOrder: (_courierId: string, orderId: string) => delivery.releaseDelivery(requireActor(), orderId),
+  listErrandCards: () => store.listErrandCards(),
+  listMyErrands: (phone: string) => store.listMyErrands(phone),
+  createErrand: (input: Parameters<typeof store.createErrand>[0]) => store.createErrand(input),
+  cancelErrand: (phone: string, errandId: string) => store.cancelErrand(phone, errandId),
+  acceptErrand: (_courierId: string, errandId: string) => store.acceptErrand(me(), errandId),
+  declineErrand: (_courierId: string, errandId: string) => store.declineErrand(me(), errandId),
+  markErrandPickedUp: (_courierId: string, errandId: string, photo: string) => store.markErrandPickedUp(me(), errandId, photo),
+  markErrandDelivered: (_courierId: string, errandId: string, photo: string, signature?: string | null) =>
+    store.markErrandDelivered(me(), errandId, photo, signature),
+  releaseErrand: (_courierId: string, errandId: string) => store.releaseErrand(me(), errandId),
+  getAdminBoard: () => delivery.adminBoard(requireActor()),
+  getAd: (slot: Parameters<typeof store.getAd>[0]) => store.getAd(slot),
+  clickAd: (id: string) => store.clickAd(id),
+  buyAd: (input: Parameters<typeof store.buyAd>[0]) => store.buyAd(input),
+  rateAsSender: (_senderId: string, orderId: string, stars: number) => store.rateAsSender(me(), orderId, stars),
+  rateAsCourier: (_courierId: string, orderId: string, stars: number) => store.rateAsCourier(me(), orderId, stars),
+  listTrips: (query?: Parameters<typeof store.listTrips>[0]) => store.listTrips(query),
+  registerTripAccount: (role: "rider" | "driver", name: string, phone: string, guestToken?: string | null) =>
+    store.registerTripAccount(role, name, phone, guestToken),
+  requestGuestCode: (kind: string, phone: string) => store.requestGuestCode(kind, phone),
+  verifyGuestCode: (kind: string, phone: string, code: string, name: string) => store.verifyGuestCode(kind, phone, code, name),
+  postTrip: (input: Parameters<typeof store.postTrip>[0]) => store.postTrip(input),
+  listMyTrips: (phone: string) => store.listMyTrips(phone),
+  updateTrip: (id: string, ownerPhone: string, input: Parameters<typeof store.updateTrip>[2]) =>
+    store.updateTrip(id, ownerPhone, input),
+  deleteTrip: (id: string, ownerPhone: string) => store.deleteTrip(id, ownerPhone),
+  tripPassStatus: (phone: string) => store.tripPassStatus(phone),
+  startTripPass: (phone: string) => store.startTripPass(phone),
+  revealTripPhone: (tripId: string, driverPhone: string) => store.revealTripPhone(tripId, driverPhone),
+  listBuilders: (kind?: "offer" | "job" | null, viewerPhone?: string | null) => store.listBuilders(kind, viewerPhone),
+  postBuilder: (input: Parameters<typeof store.postBuilder>[0]) => store.postBuilder(input),
+  listMyBuilders: (phone: string, kind?: "offer" | "job" | null, guestToken?: string | null) =>
+    store.listMyBuilders(phone, kind, guestToken),
+  updateBuilder: (id: string, ownerPhone: string, input: Parameters<typeof store.updateBuilder>[2]) =>
+    store.updateBuilder(id, ownerPhone, input),
+  closeBuilder: (id: string, ownerPhone: string, guestToken?: string | null) => store.closeBuilder(id, ownerPhone, guestToken),
+  deleteBuilder: (id: string, ownerPhone: string, guestToken?: string | null) => store.deleteBuilder(id, ownerPhone, guestToken),
+  listMyFood: (guestToken: string) => store.listMyFood(guestToken),
+  updateMyFood: (guestToken: string, ticketId: string, input: Parameters<typeof store.updateMyFood>[2]) =>
+    store.updateMyFood(guestToken, ticketId, input),
+  cancelMyFood: (guestToken: string, ticketId: string) => store.cancelMyFood(guestToken, ticketId),
+  masterSubStatus: (phone: string) => store.masterSubStatus(phone),
+  registerMaster: (name: string, phone: string) => store.registerMaster(name, phone),
+  startMasterSub: (phone: string) => store.startMasterSub(phone),
+  rateBuilder: (id: string, phone: string, stars: number) => store.rateBuilder(id, phone, stars),
+  placeFoodOrder: (input: Parameters<typeof store.placeFoodOrder>[0]) => store.placeFoodOrder(input),
+  listKitchen: (_userId: string) => store.listKitchen(me()),
+  sendKitchenToCourier: (_userId: string, ticketId: string) => store.sendKitchenToCourier(me(), ticketId),
+  foodPlaceOpen: (placeId: string) => store.foodPlaceOpen(placeId),
+  getFoodTicket: (ticketId: string) => store.getFoodTicket(ticketId),
+  foodDesk: (placeId: string, ownerPhone: string) => store.foodDesk(placeId, ownerPhone),
+  registerFoodOwner: (placeId: string, name: string, phone: string) => store.registerFoodOwner(placeId, name, phone),
+  startFoodSub: (placeId: string, phone: string) => store.startFoodSub(placeId, phone),
+  setFoodAccepting: (placeId: string, demoPhone: string, accepting: boolean) =>
+    store.setFoodAccepting(placeId, demoPhone, accepting),
+  setFoodStatus: (placeId: string, demoPhone: string, ticketId: string, status: Parameters<typeof store.setFoodStatus>[3]) =>
+    store.setFoodStatus(placeId, demoPhone, ticketId, status),
+  setKitchenStatus: (_userId: string, ticketId: string, status: Parameters<typeof store.setKitchenStatus>[2]) =>
+    store.setKitchenStatus(me(), ticketId, status),
+};
+
+export type RpcName = keyof typeof RPC;
+
+export const PUBLIC_RPC = new Set<RpcName>([
+  "getPricing",
+  "quoteFee",
+  "register",
+  "login",
+  "requestOtp",
+  "verifyOtp",
+  "listLiveJobs",
+  "listErrandCards",
+  "listMyErrands",
+  "createErrand",
+  "cancelErrand",
+  "getAd",
+  "clickAd",
+  "buyAd",
+  "listTrips",
+  "registerTripAccount",
+  "requestGuestCode",
+  "verifyGuestCode",
+  "postTrip",
+  "listMyTrips",
+  "updateTrip",
+  "deleteTrip",
+  "tripPassStatus",
+  "startTripPass",
+  "revealTripPhone",
+  "listBuilders",
+  "postBuilder",
+  "listMyBuilders",
+  "updateBuilder",
+  "closeBuilder",
+  "deleteBuilder",
+  "masterSubStatus",
+  "registerMaster",
+  "startMasterSub",
+  "rateBuilder",
+  "placeFoodOrder",
+  "listMyFood",
+  "updateMyFood",
+  "cancelMyFood",
+  "foodPlaceOpen",
+  "getFoodTicket",
+  "foodDesk",
+  "registerFoodOwner",
+  "startFoodSub",
+  "setFoodAccepting",
+  "setFoodStatus",
+]);

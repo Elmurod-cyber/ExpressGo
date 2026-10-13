@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: expressgo-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm run server
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SMS_WEBHOOK_URL
+        sync: false
+      - key: SMS_WEBHOOK_TOKEN
+        sync: false
+      - key: EG_ADMIN_PHONES
+        sync: false
