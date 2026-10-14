@@ -284,7 +284,7 @@ test("smenasi ochiq kuryerga yopiq ilova xabari boradi", async () => {
       pickupLng: 71.06,
       deliveryFee: 1,
     });
-    assert.equal(sent.some((item) => item.to === "ExponentPushToken[on]" && item.title === "Sizga taklif"), true);
+    assert.equal(sent.some((item) => item.to === "ExponentPushToken[on]" && item.title === "Yangi Buyurtma!"), true);
     assert.equal(sent.some((item) => item.to === "ExponentPushToken[off]"), false);
     sent.length = 0;
     await acceptDelivery(actorOf(on.account), order.id);

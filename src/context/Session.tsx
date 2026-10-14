@@ -123,6 +123,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const sess = await hydrateApp();
       if (cancelled) return;
+      setApiUrlState(getApiUrl());
       if (sess) {
         setLocaleState(sess.locale);
         setDockState(sess.dock === "courier" ? "courier" : "sender");

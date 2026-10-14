@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { CityTabBar, type CityTab } from "../components/CityTabBar";
@@ -12,10 +12,15 @@ import { CourierHomeScreen } from "../screens/CourierHomeScreen";
 import type { Role } from "../types";
 
 export function CityShell() {
+  const { account } = useSession();
   const [tab, setTab] = useState<CityTab>("home");
   const [homeKey, setHomeKey] = useState(0);
-  const [chrome, setChrome] = useState(true);
+  const [chrome, setChrome] = useState(false);
   const onChrome = useCallback((visible: boolean) => setChrome(visible), []);
+
+  useEffect(() => {
+    if (!account) setTab("home");
+  }, [account]);
 
   function go(next: CityTab) {
     if (next === "home") setHomeKey((key) => key + 1);
@@ -30,7 +35,7 @@ export function CityShell() {
         {tab === "orders" ? <AccountOrders /> : null}
         {tab === "profile" ? <AccountProfile /> : null}
       </View>
-      {chrome ? <CityTabBar tab={tab} onChange={go} /> : null}
+      {account && chrome ? <CityTabBar tab={tab} onChange={go} /> : null}
     </View>
   );
 }

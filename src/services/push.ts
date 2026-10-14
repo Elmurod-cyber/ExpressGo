@@ -1,6 +1,8 @@
 import { isRunningInExpoGo } from "expo";
 import Constants from "expo-constants";
-import { AppState, Platform } from "react-native";
+import * as Device from "expo-device";
+import { Alert, Platform } from "react-native";
+import { t } from "../i18n";
 import { drainRemotePushes, requeueRemotePushes, setPushToken } from "../server/store";
 import { getApiUrl } from "./endpoint";
 import { postRpc } from "./rpcCall";
@@ -21,58 +23,80 @@ const Notifications = loadNotifications();
 
 if (Notifications) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => {
-      const active = AppState.currentState === "active";
-      return {
-        shouldPlaySound: !active,
-        shouldSetBadge: false,
-        shouldShowBanner: !active,
-        shouldShowList: true,
-      };
-    },
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
+const ORDER_CHANNEL = "orders";
+
+async function ensureChannels() {
+  if (!Notifications || Platform.OS !== "android") return;
+  const pattern = [0, 250, 250, 250];
+  await Notifications.setNotificationChannelAsync(ORDER_CHANNEL, {
+    name: "Buyurtmalar bildirishnomasi",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: pattern,
+    lightColor: "#FF231F7C",
+  });
+  await Notifications.setNotificationChannelAsync(CHANNEL, {
+    name: "Express Go",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: pattern,
+    lightColor: "#155EEF",
   });
 }
 
 let allowed = false;
+let permissionTold = false;
+
+export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
+  if (!Notifications || !Device.isDevice) return;
+
+  await ensureChannels();
+  const existing = await Notifications.getPermissionsAsync();
+  let status = existing.status;
+  if (status !== "granted") {
+    status = (await Notifications.requestPermissionsAsync()).status;
+  }
+  allowed = status === "granted";
+  if (!allowed) {
+    if (!permissionTold) {
+      permissionTold = true;
+      Alert.alert(t("push.denied"));
+    }
+    return;
+  }
+
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) return;
+  try {
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return token.data || undefined;
+  } catch {
+    return;
+  }
+}
 
 export function pushSupported() {
   return Notifications !== null;
 }
 
 export async function preparePush(userId?: string | null): Promise<boolean> {
-  if (!Notifications) {
-    allowed = false;
-    return false;
-  }
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: "Express Go",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#155EEF",
-    });
-  }
-  const existing = await Notifications.getPermissionsAsync();
-  let status = existing.status;
-  if (status !== "granted") {
-    const next = await Notifications.requestPermissionsAsync();
-    status = next.status;
-  }
-  allowed = status === "granted";
-  if (allowed && userId) await saveExpoToken(userId);
+  const token = await registerForPushNotificationsAsync();
+  if (token && userId) await saveExpoToken(userId, token);
   return allowed;
 }
 
-async function saveExpoToken(userId: string) {
-  if (!Notifications) return;
+async function saveExpoToken(userId: string, token: string) {
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    if (!projectId) return;
-    const token = await Notifications.getExpoPushTokenAsync({ projectId });
-    if (!token.data) return;
     const base = getApiUrl();
-    if (base) await postRpc(base, "setPushToken", [userId, token.data], getSessionToken(), "Push saqlanmadi.");
-    else setPushToken(userId, token.data);
+    if (base) await postRpc(base, "setPushToken", [userId, token], getSessionToken(), "Push saqlanmadi.");
+    else setPushToken(userId, token);
   } catch {
     // Qurilma ilovasida token keyinroq olinadi.
   }

@@ -8,7 +8,7 @@ import {
 } from "./deliveryRepo";
 import { sendLoginCode } from "./sms";
 import { kmBetween } from "../services/distance";
-import { sendExpoPushes } from "./expoPush";
+import { sendPushNotification } from "./expoPush";
 import { setAccountNotify } from "./notifyBus";
 import { attachSignedInUser, setPushToken } from "./store";
 import { listingArea } from "./places";
@@ -228,13 +228,18 @@ export async function savePushToken(actor: Actor, token: string): Promise<void> 
   setPushToken(user.id, next);
 }
 
-async function notifyAccount(userId: string | null | undefined, title: string, body: string) {
+async function notifyAccount(
+  userId: string | null | undefined,
+  title: string,
+  body: string,
+  data: Record<string, unknown> = {},
+) {
   if (!userId) return;
   try {
     const user = await repo().readUser(userId);
     const token = user?.pushToken?.trim() ?? "";
     if (!token) return;
-    await sendExpoPushes([{ to: token, title, body }]);
+    await sendPushNotification(token, title, body, data);
   } catch (caught) {
     console.warn(caught instanceof Error ? caught.message : "Push yuborilmadi.");
   }
@@ -251,7 +256,7 @@ async function notifyOpenCouriers(order: DeliveryOrder) {
     if (now - courier.locationAt > GPS_STALE_MS) continue;
     const km = kmBetween(pickup, { lat: courier.lat, lng: courier.lng });
     if (km > matchRadiusKm(courier.vehicle)) continue;
-    await notifyAccount(courier.id, "Sizga taklif", `${order.item} yaqin.`);
+    await notifyAccount(courier.id, "Yangi Buyurtma!", `${order.pickup} → ${order.dropoff}`, { orderId: order.id });
   }
 }
 

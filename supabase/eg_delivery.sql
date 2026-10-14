@@ -13,6 +13,12 @@ create table if not exists public.eg_delivery_users (
   unique (phone, role)
 );
 
+alter table public.eg_delivery_users add column if not exists push_token text;
+
+update public.eg_delivery_users
+set push_token = nullif(body->>'pushToken', '')
+where push_token is null and nullif(body->>'pushToken', '') is not null;
+
 create table if not exists public.eg_delivery_sessions (
   token_hash text primary key,
   user_id text not null references public.eg_delivery_users (id),

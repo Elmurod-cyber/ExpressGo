@@ -1,4 +1,4 @@
-export type ExpoPush = { to: string; title: string; body: string };
+export type ExpoPush = { to: string; title: string; body: string; data?: Record<string, unknown> };
 
 export function expoPushBody(items: ExpoPush[]) {
   return items
@@ -7,8 +7,10 @@ export function expoPushBody(items: ExpoPush[]) {
       to: item.to,
       title: item.title,
       body: item.body,
+      data: item.data ?? {},
       sound: "default" as const,
-      channelId: "express-go",
+      channelId: "orders",
+      priority: "high" as const,
     }));
 }
 
@@ -19,7 +21,11 @@ async function postExpo(items: ExpoPush[]) {
   if (!messages.length) return;
   const response = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Accept-encoding": "gzip, deflate",
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(messages),
   });
   if (!response.ok) throw new Error("Push yuborilmadi.");
@@ -34,4 +40,13 @@ export function setExpoPushSender(next: Sender | null) {
 export async function sendExpoPushes(items: ExpoPush[]) {
   if (!items.length) return;
   await sender(items);
+}
+
+export async function sendPushNotification(
+  expoPushToken: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown> = {},
+) {
+  await sendExpoPushes([{ to: expoPushToken, title, body, data }]);
 }

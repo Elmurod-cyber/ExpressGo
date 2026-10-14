@@ -18,10 +18,11 @@ function connectionConfig(url: string): { connectionString: string; ssl?: { reje
   return needsSsl ? { connectionString: url, ssl: { rejectUnauthorized: false } } : { connectionString: url };
 }
 
-function asUser(body: unknown, isAdmin: boolean): DeliveryUser {
+function asUser(body: unknown, isAdmin: boolean, pushToken: unknown): DeliveryUser {
   const user = body as DeliveryUser;
   user.isAdmin = isAdmin;
   user.ledger ??= [];
+  if (typeof pushToken === "string" && pushToken.trim()) user.pushToken = pushToken.trim();
   return user;
 }
 
@@ -58,34 +59,34 @@ class PgDeliveryRepository implements DeliveryRepository {
 
   async readUser(id: string): Promise<DeliveryUser | null> {
     const result = await this.db().query(
-      "select body, is_admin from public.eg_delivery_users where id = $1",
+      "select body, is_admin, push_token from public.eg_delivery_users where id = $1",
       [id],
     );
     const row = result.rows[0];
-    return row ? asUser(row.body, row.is_admin === true) : null;
+    return row ? asUser(row.body, row.is_admin === true, row.push_token) : null;
   }
 
   async readUserByPhone(phone: string, role: Role): Promise<DeliveryUser | null> {
     const result = await this.db().query(
-      "select body, is_admin from public.eg_delivery_users where phone = $1 and role = $2",
+      "select body, is_admin, push_token from public.eg_delivery_users where phone = $1 and role = $2",
       [phone, role],
     );
     const row = result.rows[0];
-    return row ? asUser(row.body, row.is_admin === true) : null;
+    return row ? asUser(row.body, row.is_admin === true, row.push_token) : null;
   }
 
   async writeUser(user: DeliveryUser): Promise<void> {
     await this.db().query(
-      `insert into public.eg_delivery_users (id, phone, role, is_admin, body)
-       values ($1, $2, $3, $4, $5::jsonb)
-       on conflict (id) do update set phone = $2, role = $3, is_admin = $4, body = $5::jsonb`,
-      [user.id, user.phone, user.role, user.isAdmin, JSON.stringify(user)],
+      `insert into public.eg_delivery_users (id, phone, role, is_admin, body, push_token)
+       values ($1, $2, $3, $4, $5::jsonb, $6)
+       on conflict (id) do update set phone = $2, role = $3, is_admin = $4, body = $5::jsonb, push_token = $6`,
+      [user.id, user.phone, user.role, user.isAdmin, JSON.stringify(user), user.pushToken?.trim() || null],
     );
   }
 
   async listUsers(): Promise<DeliveryUser[]> {
-    const result = await this.db().query("select body, is_admin from public.eg_delivery_users");
-    return result.rows.map((row) => asUser(row.body, row.is_admin === true));
+    const result = await this.db().query("select body, is_admin, push_token from public.eg_delivery_users");
+    return result.rows.map((row) => asUser(row.body, row.is_admin === true, row.push_token));
   }
 
   async readOtp(phone: string, role: Role): Promise<OtpRow | null> {

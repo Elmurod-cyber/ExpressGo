@@ -1,3 +1,5 @@
+export const CLOUD_API_URL = "https://expressgo.onrender.com";
+
 let apiUrl = "";
 
 export function normalizeApiUrl(value: string): string {

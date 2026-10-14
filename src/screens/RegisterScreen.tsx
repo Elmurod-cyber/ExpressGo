@@ -7,7 +7,6 @@ import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import { VEHICLE_LABEL } from "../server/rules";
-import { ServerUrlField } from "../components/ServerUrlField";
 import type { OtpChallenge, Role, VehicleKind } from "../types";
 
 type AuthMode = "signup" | "login";
@@ -166,7 +165,6 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
         </View>
 
         <View className="mt-6 rounded-[28px] bg-white px-5 py-6">
-          <ServerUrlField />
           {signup ? (
             <AuthField
               label={t("auth.name")}

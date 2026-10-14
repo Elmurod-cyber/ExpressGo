@@ -7,10 +7,12 @@ import { SessionProvider } from "./src/context/Session";
 import { AreaProvider } from "./src/context/Area";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { downloadUpdateInBackground } from "./src/services/appUpdates";
+import { registerForPushNotificationsAsync } from "./src/services/push";
 
 export default function App() {
   useEffect(() => {
     void downloadUpdateInBackground();
+    void registerForPushNotificationsAsync();
   }, []);
 
   return (

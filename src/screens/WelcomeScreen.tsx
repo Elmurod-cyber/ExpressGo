@@ -148,10 +148,12 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
 
   const nestedApp =
     (gate === "sender" && account?.role === "sender") || (gate === "courier" && account?.role === "courier");
+  const pickingService =
+    gate !== null || feed === "food" || feed === "builder" || feed === "jobs" || (feed === "trips" && tripDoor === "gate");
 
   useEffect(() => {
-    onChrome?.(!nestedApp);
-  }, [nestedApp, onChrome]);
+    onChrome?.(Boolean(account) && !pickingService && !nestedApp);
+  }, [account, nestedApp, onChrome, pickingService]);
 
   if (gate === "sender") {
     if (account?.role === "sender") return <SenderApp onBack={() => setGate(null)} />;
@@ -236,19 +238,19 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
           {tile > 0 ? (
             <>
               <View className="flex-row" style={{ gap: 8 }}>
-                <ServiceTile art={homeArt.scooter} label={t("city.tile_delivery")} width={tile} height={tileH} onPress={() => pickFeed("jobs")} />
                 <ServiceTile art={homeArt.food} label={t("home.food")} width={tile} height={tileH} onPress={() => pickFeed("food")} />
-                <ServiceTile art={homeArt.bus} label={t("city.tile_trip")} width={tile} height={tileH} onPress={() => pickFeed("trips")} />
+                <ServiceTile art={homeArt.barber} label={t("city.tile_barber")} width={tile} height={tileH} onPress={() => pickFeed("barber")} />
+                <ServiceTile art={homeArt.build} label={t("city.tile_builder")} width={tile} height={tileH} onPress={() => pickFeed("builder")} />
               </View>
               <View className="mt-2 flex-row" style={{ gap: 8 }}>
-                <ServiceTile art={homeArt.build} label={t("city.tile_builder")} width={tile} height={tileH} onPress={() => pickFeed("builder")} />
+                <ServiceTile art={homeArt.bus} label={t("city.tile_trip")} width={tile} height={tileH} onPress={() => pickFeed("trips")} />
                 <ServiceTile
-                  art={homeArt.barber}
-                  label={t("city.tile_barber")}
+                  art={homeArt.scooter}
+                  label={t("city.tile_delivery")}
                   width={tile * 2 + 8}
                   height={tileH}
                   wide
-                  onPress={() => pickFeed("barber")}
+                  onPress={() => pickFeed("jobs")}
                 />
               </View>
             </>

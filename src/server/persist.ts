@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { exportSnapshot, importSnapshot } from "./store";
 import { getLocale, setLocale, type Locale } from "../i18n";
 import type { AppDock } from "../components/DemoDock";
-import { getApiUrl, setApiUrl } from "../services/endpoint";
+import { CLOUD_API_URL, getApiUrl, setApiUrl } from "../services/endpoint";
 import { startCloudSync } from "../services/cloud";
 
 const STORE_KEY = "expressgo.v1.store";
@@ -21,6 +21,11 @@ let lastStore = "";
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let hydrating: Promise<SessionSnap | null> | null = null;
 
+function ensureApiUrl() {
+  if (!getApiUrl()) setApiUrl(process.env.EXPO_PUBLIC_API_URL ?? "");
+  if (!getApiUrl()) setApiUrl(CLOUD_API_URL);
+}
+
 /** Bir marta o'qiladi: ikkinchi import jonli store'ni eski nusxa bilan almashtirib yuboradi. */
 export function hydrateApp(): Promise<SessionSnap | null> {
   if (!hydrating) hydrating = readSaved();
@@ -37,7 +42,7 @@ async function readSaved(): Promise<SessionSnap | null> {
       setLocale(locale);
       const applied = getLocale();
       setApiUrl(typeof parsed.apiUrl === "string" ? parsed.apiUrl : "");
-      if (!getApiUrl()) setApiUrl(process.env.EXPO_PUBLIC_API_URL ?? "");
+      ensureApiUrl();
       const dock: AppDock = parsed.dock === "courier" || parsed.dock === "admin" ? parsed.dock : "sender";
       snap = {
         accountId: typeof parsed.accountId === "string" ? parsed.accountId : null,
@@ -52,7 +57,7 @@ async function readSaved(): Promise<SessionSnap | null> {
     }
   }
 
-  if (!getApiUrl()) setApiUrl(process.env.EXPO_PUBLIC_API_URL ?? "");
+  ensureApiUrl();
 
   if (!getApiUrl()) {
     const raw = await AsyncStorage.getItem(STORE_KEY);

@@ -33,7 +33,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      ],
+      "package": "com.elmurodmobil.ProExpress"
     },
     "web": {
       "favicon": "./assets/favicon.png",
