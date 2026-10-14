@@ -32,7 +32,8 @@ if (Notifications) {
   });
 }
 
-const ORDER_CHANNEL = "orders";
+const ORDER_CHANNEL = "order-alert";
+const ORDER_SOUND = "order_alert";
 
 async function ensureChannels() {
   if (!Notifications || Platform.OS !== "android") return;
@@ -42,6 +43,7 @@ async function ensureChannels() {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: pattern,
     lightColor: "#FF231F7C",
+    sound: ORDER_SOUND,
   });
   await Notifications.setNotificationChannelAsync(CHANNEL, {
     name: "Express Go",

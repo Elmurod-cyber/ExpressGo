@@ -8,8 +8,8 @@ export function expoPushBody(items: ExpoPush[]) {
       title: item.title,
       body: item.body,
       data: item.data ?? {},
-      sound: "default" as const,
-      channelId: "orders",
+      sound: "order_alert.mp3",
+      channelId: "order-alert",
       priority: "high" as const,
     }));
 }
