@@ -6,6 +6,7 @@ import {
   type DeliveryRepository,
   type DeliveryUser,
 } from "./deliveryRepo";
+import { t } from "../i18n";
 import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { kmBetween } from "../services/distance";
 import { sendPushNotification } from "./expoPush";
@@ -37,6 +38,7 @@ import type {
   JobTiming,
   LedgerEntry,
   LiveJob,
+  MapPin,
   OtpChallenge,
   Role,
   SenderOrder,
@@ -509,7 +511,47 @@ function courierView(order: DeliveryOrder, senderName: string, assigned: boolean
   };
 }
 
-function emptyBoard(active: CourierOrder | null, waiting: CourierOrder[], completed: CourierOrder[]): CourierBoard {
+function boardPins(courier: DeliveryUser, orders: DeliveryOrder[]): MapPin[] {
+  const pins: MapPin[] = [];
+  const fresh =
+    courier.lat != null &&
+    courier.lng != null &&
+    courier.locationAt != null &&
+    Date.now() - courier.locationAt <= GPS_STALE_MS;
+  if (fresh && courier.lat != null && courier.lng != null) {
+    const busy = orders.some(
+      (order) => order.courierId === courier.id && (order.status === "accepted" || order.status === "picked_up"),
+    );
+    pins.push({
+      id: courier.id,
+      kind: "courier",
+      lat: courier.lat,
+      lng: courier.lng,
+      label: t("map.pin.courier"),
+      tone: busy ? "busy" : "free",
+    });
+  }
+  for (const order of orders) {
+    if (order.status !== "posted" || order.courierId || order.declinedBy.includes(courier.id)) continue;
+    if (order.pickupLat == null || order.pickupLng == null) continue;
+    pins.push({
+      id: order.id,
+      kind: "job",
+      lat: order.pickupLat,
+      lng: order.pickupLng,
+      label: t("map.pin.order"),
+      tone: "job",
+    });
+  }
+  return pins;
+}
+
+function emptyBoard(
+  active: CourierOrder | null,
+  waiting: CourierOrder[],
+  completed: CourierOrder[],
+  pins: MapPin[] = [],
+): CourierBoard {
   return {
     active,
     ping: null,
@@ -521,7 +563,7 @@ function emptyBoard(active: CourierOrder | null, waiting: CourierOrder[], comple
     errands: [],
     activeErrand: null,
     completedErrands: [],
-    pins: [],
+    pins,
   };
 }
 
@@ -762,6 +804,7 @@ export async function courierBoard(actor: Actor): Promise<CourierBoard> {
     activeRow ? courierView(activeRow, await senderName(activeRow), true) : null,
     await Promise.all(waiting.map(async (order) => courierView(order, await senderName(order), false))),
     await Promise.all(completed.map(async (order) => courierView(order, await senderName(order), true))),
+    boardPins(courier, orders),
   );
 }
 

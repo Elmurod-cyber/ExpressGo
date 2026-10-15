@@ -157,7 +157,7 @@ export function CourierHomeScreen({
       }
     }
     void beat();
-    const gps = setInterval(() => void beat(), 20000);
+    const gps = setInterval(() => void beat(), 10_000);
     const poll = setInterval(() => {
       void api.getCourierBoard(id).then((next) => {
         if (!cancelled) setBoard(next);

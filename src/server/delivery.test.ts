@@ -10,6 +10,7 @@ import { createFileDeliveryRepository } from "./deliveryRepo";
 import {
   acceptDelivery,
   adminBoard,
+  courierBoard,
   cancelDelivery,
   createDeliveryOrder,
   creditAsAdmin,
@@ -189,6 +190,19 @@ test("admin hujjat bo'limi kutilayotgan rasmlarni ko'rsatadi", async () => {
   const after = await adminBoard(adminActor);
   assert.equal(after.reviews.length, 2);
   assert.equal(after.reviews.some((item) => item.kind === "passport"), false);
+});
+
+test("kuryer xaritada o'z belgisini ko'radi", async () => {
+  useTempRepo();
+  const courier = await signIn("courier", "998900000061", "Karim", "walk");
+  const actor = actorOf(courier.account);
+  assert.equal((await courierBoard(actor)).pins.length, 0);
+  const board = await pingCourier(actor, 40.71, 71.06);
+  assert.equal(board.pins.length, 1);
+  assert.equal(board.pins[0]?.kind, "courier");
+  assert.equal(board.pins[0]?.tone, "free");
+  assert.equal(board.pins[0]?.lat, 40.71);
+  assert.equal(board.pins[0]?.lng, 71.06);
 });
 
 test("vakolatsiz foydalanuvchi admin amalini bajara olmaydi", async () => {
