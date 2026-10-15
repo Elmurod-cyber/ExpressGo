@@ -22,6 +22,7 @@ import {
   quoteRelease,
   vehicleFits,
   GPS_STALE_MS,
+  PING_MS,
   matchRadiusKm,
   DOC_LABEL,
 } from "./rules";
@@ -546,15 +547,60 @@ function boardPins(courier: DeliveryUser, orders: DeliveryOrder[]): MapPin[] {
   return pins;
 }
 
+const offerSeen = new Map<string, number>();
+
+function offerDeadline(courierId: string, orderId: string): number {
+  const key = `${courierId}:${orderId}`;
+  const start = offerSeen.get(key) ?? Date.now();
+  if (!offerSeen.has(key)) offerSeen.set(key, start);
+  return start + PING_MS;
+}
+
+async function offerFor(courier: DeliveryUser, orders: DeliveryOrder[]): Promise<CourierOrder | null> {
+  if (!courier.shiftOn || !courier.vehicle || !docsApproved(courier)) return null;
+  if (courier.lat == null || courier.lng == null || courier.locationAt == null) return null;
+  if (Date.now() - courier.locationAt > GPS_STALE_MS) return null;
+  const busy = orders.some(
+    (order) => order.courierId === courier.id && (order.status === "accepted" || order.status === "picked_up"),
+  );
+  if (busy) return null;
+  const here = { lat: courier.lat, lng: courier.lng };
+  let best: { order: DeliveryOrder; km: number } | null = null;
+  for (const order of orders) {
+    if (order.status !== "posted" || order.courierId) continue;
+    if (order.readyAt > Date.now()) continue;
+    if (order.declinedBy.includes(courier.id)) continue;
+    if (!vehicleFits(courier.vehicle, order.vehicle)) continue;
+    if (order.pickupLat == null || order.pickupLng == null) continue;
+    const km = kmBetween({ lat: order.pickupLat, lng: order.pickupLng }, here);
+    if (km > matchRadiusKm(courier.vehicle)) continue;
+    if (!best || km < best.km) best = { order, km };
+  }
+  if (!best) return null;
+  const until = offerDeadline(courier.id, best.order.id);
+  if (until <= Date.now()) return null;
+  const view = courierView(best.order, (await nameOf(best.order.senderId)) ?? "Buyurtmachi", false);
+  const low = courier.balance < best.order.commission;
+  return {
+    ...view,
+    offeredToYou: true,
+    pingUntil: until,
+    courierKm: Math.round(best.km * 10) / 10,
+    acceptAllowed: !low,
+    acceptReason: low ? "Depozit yetarli emas." : view.acceptReason,
+  };
+}
+
 function emptyBoard(
   active: CourierOrder | null,
   waiting: CourierOrder[],
   completed: CourierOrder[],
   pins: MapPin[] = [],
+  ping: CourierOrder | null = null,
 ): CourierBoard {
   return {
     active,
-    ping: null,
+    ping,
     errandPing: null,
     nearby: [],
     waiting,
@@ -805,6 +851,7 @@ export async function courierBoard(actor: Actor): Promise<CourierBoard> {
     await Promise.all(waiting.map(async (order) => courierView(order, await senderName(order), false))),
     await Promise.all(completed.map(async (order) => courierView(order, await senderName(order), true))),
     boardPins(courier, orders),
+    await offerFor(courier, orders),
   );
 }
 

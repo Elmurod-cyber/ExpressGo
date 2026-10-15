@@ -11,6 +11,7 @@ import {
   acceptDelivery,
   adminBoard,
   courierBoard,
+  declineDelivery,
   cancelDelivery,
   createDeliveryOrder,
   creditAsAdmin,
@@ -203,6 +204,46 @@ test("kuryer xaritada o'z belgisini ko'radi", async () => {
   assert.equal(board.pins[0]?.tone, "free");
   assert.equal(board.pins[0]?.lat, 40.71);
   assert.equal(board.pins[0]?.lng, 71.06);
+});
+
+test("yaqin buyurtma ochiq ilovada taklif bo'lib chiqadi", async () => {
+  const repo = useTempRepo();
+  const sender = await signIn("sender", "998900000071", "Ali");
+  const courier = await signIn("courier", "998900000072", "Karim", "walk");
+  const admin = await signIn("sender", "998900000073", "Admin");
+  const adminUser = await repo.readUser(admin.account.id);
+  assert.ok(adminUser);
+  adminUser.isAdmin = true;
+  await repo.writeUser(adminUser);
+  const adminActor = { ...actorOf(admin.account), isAdmin: true };
+  await submitDoc(actorOf(courier.account), "passport", "file://passport");
+  await reviewDoc(adminActor, courier.account.id, "passport", true);
+  await creditAsAdmin(adminActor, courier.account.id, 20000);
+  const fresh = await repo.readUser(courier.account.id);
+  assert.ok(fresh);
+  await setCourierShift({ ...actorOf(courier.account), id: fresh.id }, true);
+  await pingCourier(actorOf(courier.account), 40.71, 71.06);
+  const quiet = await courierBoard(actorOf(courier.account));
+  assert.equal(quiet.ping, null);
+  await createDeliveryOrder(actorOf(sender.account), {
+    pickup: "Shahrixon markaz",
+    dropoff: "Bozor",
+    item: "Hujjat",
+    customerPhone: "998900000079",
+    vehicle: "walk",
+    pickupLat: 40.712,
+    pickupLng: 71.061,
+    dropoffLat: 40.72,
+    dropoffLng: 71.07,
+  });
+  const board = await courierBoard(actorOf(courier.account));
+  assert.equal(board.ping?.offeredToYou, true);
+  assert.equal(board.ping?.item, "Hujjat");
+  assert.ok((board.ping?.pingUntil ?? 0) > Date.now());
+  const again = await courierBoard(actorOf(courier.account));
+  assert.equal(again.ping?.pingUntil, board.ping?.pingUntil);
+  await declineDelivery(actorOf(courier.account), board.ping?.id ?? "");
+  assert.equal((await courierBoard(actorOf(courier.account))).ping, null);
 });
 
 test("vakolatsiz foydalanuvchi admin amalini bajara olmaydi", async () => {
