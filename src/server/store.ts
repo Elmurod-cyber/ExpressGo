@@ -228,6 +228,7 @@ const trips: TripRecord[] = [];
 export type StoredTrip = {
   id: string;
   phone: string;
+  offer?: "rider" | "driver";
   passengerName: string;
   from: string;
   to: string;
@@ -239,6 +240,8 @@ export type StoredTrip = {
   seats: number;
   price: number;
   note: string;
+  vehicle?: string;
+  photo?: string | null;
   at: number;
 };
 
@@ -254,6 +257,7 @@ function storedTrip(trip: TripRecord): StoredTrip {
   return {
     id: trip.id,
     phone: trip.phone,
+    offer: trip.offer === "driver" ? "driver" : "rider",
     passengerName: trip.passengerName,
     from: trip.from,
     to: trip.to,
@@ -265,6 +269,8 @@ function storedTrip(trip: TripRecord): StoredTrip {
     seats: trip.seats,
     price: trip.price,
     note: trip.note,
+    vehicle: trip.vehicle,
+    photo: trip.photo,
     at: trip.at,
   };
 }
@@ -273,7 +279,13 @@ function applyStoredTrips(rows: StoredTrip[]) {
   trips.length = 0;
   let max = tripSeq;
   for (const row of rows) {
-    trips.push({ ...row });
+    const photo = typeof row.photo === "string" && row.photo.startsWith("data:image/") ? row.photo : null;
+    trips.push({
+      ...row,
+      offer: row.offer === "driver" ? "driver" : "rider",
+      vehicle: typeof row.vehicle === "string" ? row.vehicle : "",
+      photo,
+    });
     const seq = Number(String(row.id).replace(/^t/, ""));
     if (Number.isFinite(seq) && seq > max) max = seq;
   }
@@ -494,6 +506,7 @@ let foodSeq = 1;
 
 type TripRecord = {
   id: string;
+  offer: "rider" | "driver";
   passengerName: string;
   phone: string;
   from: string;
@@ -506,6 +519,8 @@ type TripRecord = {
   seats: number;
   price: number;
   note: string;
+  vehicle: string;
+  photo: string | null;
   at: number;
 };
 
@@ -3519,6 +3534,7 @@ function toTripCard(trip: TripRecord, here?: MapPoint | null): TripCard {
   const km = here && fromPoint ? kmBetween(here, fromPoint) : null;
   return {
     id: trip.id,
+    offer: trip.offer === "driver" ? "driver" : "rider",
     passengerName: trip.passengerName,
     phoneMasked: maskPhone(trip.phone),
     from: trip.from,
@@ -3532,6 +3548,8 @@ function toTripCard(trip: TripRecord, here?: MapPoint | null): TripCard {
     seats: trip.seats,
     price: trip.price,
     note: scrubPhones(trip.note),
+    vehicle: trip.vehicle,
+    photo: trip.photo,
     at: trip.at,
   };
 }
@@ -3656,8 +3674,8 @@ function grantDriverTrial(driverId: string, phone: string): void {
   });
 }
 
-function riderById(id: string): TripAccount {
-  const account = tripAccounts.find((item) => item.id === id && item.role === "rider");
+function tripOwner(id: string): TripAccount {
+  const account = tripAccounts.find((item) => item.id === id);
   if (!account) fail("Ro'yxat topilmadi.");
   return account;
 }
@@ -3688,7 +3706,7 @@ export async function listTrips(query?: TripQuery | null): Promise<TripCard[]> {
       return kmBetween(here, origin) <= TRIP_NEAR_KM;
     })
     .sort((a, b) => b.at - a.at)
-    .map((trip) => ({ ...toTripCard(trip, here), note: "" }));
+    .map((trip) => toTripCard(trip, here));
 }
 
 export type TripWrite = {
@@ -3704,12 +3722,16 @@ export type TripWrite = {
   seats: number;
   price: number;
   note?: string | null;
+  vehicle?: string | null;
+  photo?: string | null;
   accountId?: string | null;
 };
 
 function readTripWrite(input: TripWrite): Omit<TripRecord, "id" | "at"> {
   const name = input.name.trim();
-  const phone = input.accountId ? riderById(input.accountId).phone : phoneKey(input.phone);
+  const owner = input.accountId ? tripOwner(input.accountId) : null;
+  const phone = owner ? owner.phone : phoneKey(input.phone);
+  const offer: "rider" | "driver" = owner?.role === "driver" ? "driver" : "rider";
   const from = input.from.trim();
   const to = input.to.trim();
   const fromPoint = pointOf(input.fromLat, input.fromLng);
@@ -3724,7 +3746,11 @@ function readTripWrite(input: TripWrite): Omit<TripRecord, "id" | "at"> {
   if (whenLabel.length < 3) fail("Qachon ketishingizni yozing.");
   if (seats < 1 || seats > 4) fail("O'rin 1 dan 4 gacha.");
   if (!Number.isFinite(price) || price < 0) fail("Narxni yozing.");
+  const vehicle = offer === "driver" ? (input.vehicle ?? "").trim().slice(0, 40) : "";
+  const shot = (input.photo ?? "").trim();
+  if (offer === "driver" && shot && (!shot.startsWith("data:image/") || shot.length > 500_000)) fail("Rasm juda katta. Boshqa rasm tanlang.");
   return {
+    offer,
     passengerName: name,
     phone,
     from,
@@ -3737,6 +3763,8 @@ function readTripWrite(input: TripWrite): Omit<TripRecord, "id" | "at"> {
     seats,
     price,
     note: scrubPhones((input.note ?? "").trim()),
+    vehicle,
+    photo: offer === "driver" && shot ? shot : null,
   };
 }
 
@@ -3749,18 +3777,19 @@ export async function postTrip(input: TripWrite): Promise<TripCard> {
 }
 
 export async function listMyTrips(accountId: string): Promise<TripCard[]> {
-  const account = riderById(accountId);
+  const account = tripOwner(accountId);
   await pullTrips();
   return trips
-    .filter((trip) => samePhone(trip.phone, account.phone))
+    .filter((trip) => samePhone(trip.phone, account.phone) && (trip.offer === "driver" ? "driver" : "rider") === account.role)
     .sort((a, b) => b.at - a.at)
     .map((trip) => toTripCard(trip));
 }
 
 export async function updateTrip(id: string, accountId: string, input: TripWrite): Promise<TripCard> {
-  const account = riderById(accountId);
+  const account = tripOwner(accountId);
   const trip = trips.find((item) => item.id === id);
-  if (!trip || !samePhone(trip.phone, account.phone)) fail("E'lon topilmadi.");
+  const side = trip?.offer === "driver" ? "driver" : "rider";
+  if (!trip || !samePhone(trip.phone, account.phone) || side !== account.role) fail("E'lon topilmadi.");
   const next: TripRecord = { ...trip, ...readTripWrite({ ...input, accountId }) };
   if (tripRepo) await tripRepo.upsert(storedTrip(next));
   Object.assign(trip, next);
@@ -3768,8 +3797,10 @@ export async function updateTrip(id: string, accountId: string, input: TripWrite
 }
 
 export async function deleteTrip(id: string, accountId: string): Promise<void> {
-  const account = riderById(accountId);
-  const index = trips.findIndex((item) => item.id === id && samePhone(item.phone, account.phone));
+  const account = tripOwner(accountId);
+  const index = trips.findIndex(
+    (item) => item.id === id && samePhone(item.phone, account.phone) && (item.offer === "driver" ? "driver" : "rider") === account.role,
+  );
   if (index < 0) fail("E'lon topilmadi.");
   if (tripRepo) await tripRepo.remove(id);
   trips.splice(index, 1);

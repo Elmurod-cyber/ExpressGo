@@ -19,7 +19,10 @@ create table if not exists public.eg_trip_ads (
   seats integer not null,
   price integer not null,
   note text not null default '',
-  created_at bigint not null
+  created_at bigint not null,
+  offer text not null default 'rider',
+  vehicle text not null default '',
+  photo text not null default ''
 );
 
 alter table public.eg_trip_ads enable row level security;

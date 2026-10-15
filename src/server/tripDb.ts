@@ -23,6 +23,7 @@ function asTrip(row: Record<string, unknown>): StoredTrip {
   return {
     id: String(row.id),
     phone: String(row.owner_phone),
+    offer: row.offer === "driver" ? "driver" : "rider",
     passengerName: String(row.passenger_name),
     from: String(row.from_place),
     to: String(row.to_place),
@@ -34,6 +35,8 @@ function asTrip(row: Record<string, unknown>): StoredTrip {
     seats: Number(row.seats),
     price: Number(row.price),
     note: String(row.note ?? ""),
+    vehicle: String(row.vehicle ?? ""),
+    photo: typeof row.photo === "string" && row.photo.startsWith("data:image/") ? row.photo : null,
     at: Number(row.created_at),
   };
 }
@@ -55,6 +58,9 @@ export async function connectTripDatabase(): Promise<{ ok: true } | { ok: false;
       reason = "public.eg_trip_ads jadvali yo'q. supabase/eg_trip_ads.sql ni SQL Editor da ishga tushiring.";
       return { ok: false, reason };
     }
+    await next.query("alter table public.eg_trip_ads add column if not exists offer text not null default 'rider'");
+    await next.query("alter table public.eg_trip_ads add column if not exists vehicle text not null default ''");
+    await next.query("alter table public.eg_trip_ads add column if not exists photo text not null default ''");
     pool = next;
     ready = true;
     reason = "";
@@ -74,7 +80,7 @@ export function tripRepository(): TripRepository {
       if (!pool) return [];
       const result = await pool.query(
         `select id, owner_phone, passenger_name, from_place, to_place, from_lat, from_lng, to_lat, to_lng,
-                when_label, seats, price, note, created_at
+                when_label, seats, price, note, created_at, offer, vehicle, photo
          from public.eg_trip_ads
          order by created_at desc`,
       );
@@ -85,10 +91,11 @@ export function tripRepository(): TripRepository {
       await pool.query(
         `insert into public.eg_trip_ads (
            id, owner_phone, passenger_name, from_place, to_place, from_lat, from_lng, to_lat, to_lng,
-           when_label, seats, price, note, created_at
-         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           when_label, seats, price, note, created_at, offer, vehicle, photo
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          on conflict (id) do update set
            owner_phone = excluded.owner_phone,
+           offer = excluded.offer,
            passenger_name = excluded.passenger_name,
            from_place = excluded.from_place,
            to_place = excluded.to_place,
@@ -100,6 +107,8 @@ export function tripRepository(): TripRepository {
            seats = excluded.seats,
            price = excluded.price,
            note = excluded.note,
+           vehicle = excluded.vehicle,
+           photo = excluded.photo,
            created_at = excluded.created_at`,
         [
           row.id,
@@ -116,6 +125,9 @@ export function tripRepository(): TripRepository {
           row.price,
           row.note,
           row.at,
+          row.offer === "driver" ? "driver" : "rider",
+          row.vehicle ?? "",
+          row.photo ?? "",
         ],
       );
     },

@@ -12,9 +12,10 @@ type ScreenProps = {
   scrollRef?: Ref<ScrollView>;
   compact?: boolean;
   surface?: string;
+  keyboardInsets?: boolean;
 };
 
-export function Screen({ children, scroll = true, footer, scrollRef, compact = false, surface = "bg-canvas" }: ScreenProps) {
+export function Screen({ children, scroll = true, footer, scrollRef, compact = false, surface = "bg-canvas", keyboardInsets = false }: ScreenProps) {
   return (
     <SafeAreaView className={`flex-1 ${surface}`} edges={["top"]}>
       {scroll ? (
@@ -23,6 +24,7 @@ export function Screen({ children, scroll = true, footer, scrollRef, compact = f
           className="flex-1"
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={keyboardInsets}
           showsVerticalScrollIndicator={false}
         >
           <View className={compact ? "" : "flex-1"}>{children}</View>

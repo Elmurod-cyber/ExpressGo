@@ -10,7 +10,7 @@ import { describePoint, findPlace, type MapPoint } from "../services/geo";
 import { roadRoute } from "../services/route";
 import { formatMoney } from "../services/money";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import { DISTRICTS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, guessDistrict, type ReadySlotId } from "../server/rules";
+import { COURIER_VEHICLES, DISTRICTS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, guessDistrict, type ReadySlotId } from "../server/rules";
 import type { SavedAddresses, SavedSlot, VehicleKind } from "../types";
 import { useT } from "../context/Session";
 
@@ -308,8 +308,8 @@ export function CreateErrandScreen({ onDone, onBack }: CreateErrandScreenProps) 
           </View>
 
           <Text className="mt-4 text-xs text-muted">{t("auth.vehicle")}</Text>
-          <View className="mt-2 flex-row">
-            {(["walk", "moto", "car", "cargo"] as VehicleKind[]).map((kind) => (
+          <View className="mt-2 flex-row flex-wrap">
+            {COURIER_VEHICLES.map((kind) => (
               <Chip
                 key={kind}
                 label={VEHICLE_LABEL[kind]}

@@ -3,6 +3,7 @@ import { exportSnapshot, importSnapshot } from "./store";
 import { getLocale, setLocale, type Locale } from "../i18n";
 import type { AppDock } from "../components/DemoDock";
 import { CLOUD_API_URL, getApiUrl, setApiUrl } from "../services/endpoint";
+import type { Account } from "../types";
 import { startCloudSync } from "../services/cloud";
 
 const STORE_KEY = "expressgo.v1.store";
@@ -10,6 +11,7 @@ const SESSION_KEY = "expressgo.v1.session";
 
 export type SessionSnap = {
   accountId: string | null;
+  account: Account | null;
   dock: AppDock;
   locale: Locale;
   pushOn: boolean;
@@ -44,8 +46,12 @@ async function readSaved(): Promise<SessionSnap | null> {
       setApiUrl(typeof parsed.apiUrl === "string" ? parsed.apiUrl : "");
       ensureApiUrl();
       const dock: AppDock = parsed.dock === "courier" || parsed.dock === "admin" ? parsed.dock : "sender";
+      const savedAccount = parsed.account;
+      const account =
+        savedAccount && typeof savedAccount === "object" && typeof savedAccount.id === "string" ? savedAccount : null;
       snap = {
-        accountId: typeof parsed.accountId === "string" ? parsed.accountId : null,
+        accountId: typeof parsed.accountId === "string" ? parsed.accountId : account?.id ?? null,
+        account,
         dock,
         locale: applied,
         pushOn: parsed.pushOn !== false,

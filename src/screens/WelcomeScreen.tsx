@@ -312,11 +312,12 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
                   <HomeAd
                     key={`trip-${card.trip.id}`}
                     art={homeArt.bus}
-                    kicker={t("city.tile_trip")}
+                    kicker={card.trip.offer === "driver" ? t("trip.driver") : t("trip.rider")}
                     title={`${card.trip.from} → ${card.trip.to}`}
                     body={`${card.trip.whenLabel} · ${t("trip.seats")}: ${card.trip.seats}`}
-                    place={card.trip.from}
-                    money={formatMoney(card.trip.price)}
+                    place={card.trip.vehicle ? `${card.trip.from} · ${card.trip.vehicle}` : card.trip.from}
+                    money={card.trip.price > 0 ? formatMoney(card.trip.price) : t("trip.deal")}
+                    portrait={card.trip.photo}
                     onPress={() => openDetail({ kind: "trip", id: card.trip.id })}
                   />
                 ) : (
@@ -380,7 +381,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
                   <Text className="mt-1 text-lg font-bold text-[#C2410C]">
                     {t("trip.seats")}: {trip.seats}
                   </Text>
-                  <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{formatMoney(trip.price)}</Text>
+                  <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{trip.price > 0 ? formatMoney(trip.price) : t("trip.deal")}</Text>
                   <Text className="mt-2 text-base font-semibold text-brand">{opened[trip.id]?.phone ?? trip.phoneMasked}</Text>
                 </Pressable>
               ))
@@ -449,14 +450,16 @@ function TripSheet({
   return (
     <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
       <View className="flex-row items-center justify-between">
-        <Text className="text-xs font-semibold text-[#FF8A00]">{t("city.tile_trip")}</Text>
+        <Text className="text-xs font-semibold text-[#FF8A00]">{trip.offer === "driver" ? t("trip.driver") : t("trip.rider")}</Text>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("close")}>
           <Text className="text-sm font-semibold text-[#A3A3A3]">{t("close")}</Text>
         </Pressable>
       </View>
+      {trip.photo ? <Image source={{ uri: trip.photo }} style={{ width: 72, height: 72, borderRadius: 36, marginTop: 12 }} /> : null}
       <Text className="mt-3 text-xl font-bold text-white">
         {trip.from} → {trip.to}
       </Text>
+      {trip.vehicle ? <DetailLine label={t("trip.vehicle")} value={trip.vehicle} /> : null}
       <DetailLine label={t("trip.when")} value={trip.whenLabel} />
       <Text className="mt-3 text-lg font-bold text-[#FF8A00]">
         {t("trip.seats")}: {trip.seats}
@@ -492,7 +495,8 @@ function TripSheet({
           <Text className="text-base font-bold text-white">{t("city.take")}</Text>
         </Pressable>
       ) : null}
-      <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{formatMoney(trip.price)}</Text>
+      {trip.note ? <Text className="mt-2 text-sm text-[#A3A3A3]">{trip.note}</Text> : null}
+      <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{trip.price > 0 ? formatMoney(trip.price) : t("trip.deal")}</Text>
     </View>
   );
 }
@@ -533,6 +537,7 @@ function HomeAd({
   body,
   place,
   money,
+  portrait,
   onPress,
 }: {
   art: number;
@@ -541,6 +546,7 @@ function HomeAd({
   body: string;
   place: string;
   money: string;
+  portrait?: string | null;
   onPress: () => void;
 }) {
   return (
@@ -549,7 +555,7 @@ function HomeAd({
       accessibilityRole="button"
       className="mt-2.5 flex-row items-center rounded-[18px] bg-[#242424] p-2.5 active:opacity-90"
     >
-      <Image source={art} style={{ width: 62, height: 62, borderRadius: 14 }} resizeMode="cover" />
+      <Image source={portrait ? { uri: portrait } : art} style={{ width: 62, height: 62, borderRadius: portrait ? 31 : 14 }} resizeMode="cover" />
       <View className="ml-3 min-w-0 flex-1">
         <Text className="text-xs font-semibold text-[#FF8A00]" numberOfLines={1}>
           {kicker}

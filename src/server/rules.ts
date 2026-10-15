@@ -132,6 +132,9 @@ const VEHICLE_MULT: Record<VehicleKind, number> = {
   cargo: 1.35,
 };
 
+/** Tanlovda chiqadigan tariflar. Piyoda yopilgan. */
+export const COURIER_VEHICLES: VehicleKind[] = ["moto", "car", "cargo"];
+
 export const VEHICLE_LABEL: Record<VehicleKind, string> = {
   get walk() {
     return t("vehicle.walk");

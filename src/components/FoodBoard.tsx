@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Dimensions, Image, Keyboard, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "./Screen";
 import { PhoneCodeBox } from "./PhoneCodeBox";
@@ -15,8 +15,31 @@ import { RestaurantDesk } from "./RestaurantDesk";
 export function FoodScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
   const [placeId, setPlaceId] = useState<string | null>(null);
+  const [customer, setCustomer] = useState<FoodProfile | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
+  useEffect(() => {
+    let stop = false;
+    void readFoodProfile().then((row) => {
+      if (stop) return;
+      setCustomer(row);
+      setProfileReady(true);
+    });
+    return () => {
+      stop = true;
+    };
+  }, []);
   const place = FOOD_PLACES.find((item) => item.id === placeId) ?? null;
-  if (place) return <PlaceMenu place={place} onBack={() => setPlaceId(null)} />;
+  if (place) {
+    return (
+      <PlaceMenu
+        place={place}
+        customer={customer}
+        profileReady={profileReady}
+        onCustomer={setCustomer}
+        onBack={() => setPlaceId(null)}
+      />
+    );
+  }
 
   return (
     <Screen compact>
@@ -26,6 +49,26 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
           <Text className="ml-1 text-sm font-semibold text-brand">{t("food.back")}</Text>
         </Pressable>
         <Text className="text-2xl font-bold text-ink">{t("city.tile_food")}</Text>
+        {customer ? (
+          <>
+            <FoodMine
+              token={customer.token}
+              onExpired={() => {
+                void clearFoodProfile();
+                setCustomer(null);
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                void clearFoodProfile().then(() => setCustomer(null));
+              }}
+              accessibilityRole="button"
+              className="mt-3 items-center rounded-full bg-white py-3"
+            >
+              <Text className="text-sm font-semibold text-muted">{t("food.other_phone")}</Text>
+            </Pressable>
+          </>
+        ) : null}
         {FOOD_PLACES.map((item) => (
           <Pressable
             key={item.id}
@@ -56,8 +99,23 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) {
+function PlaceMenu({
+  place,
+  onBack,
+  customer,
+  profileReady,
+  onCustomer,
+}: {
+  place: FoodPlace;
+  onBack: () => void;
+  customer: FoodProfile | null;
+  profileReady: boolean;
+  onCustomer: (next: FoodProfile | null) => void;
+}) {
   const t = useT();
+  const pageScroll = useRef<ScrollView>(null);
+  const dropoffFocused = useRef(false);
+  const [keyboardLift, setKeyboardLift] = useState(0);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [dropoff, setDropoff] = useState("");
@@ -72,7 +130,6 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
   const [gatePhone, setGatePhone] = useState(formatUzPhone(""));
   const [gateError, setGateError] = useState<string | null>(null);
   const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
-  const [customer, setCustomer] = useState<FoodProfile | null>(null);
   const [mine, setMine] = useState(false);
   const digits = place.phone.replace(/\D/g, "");
   const lines = place.dishes
@@ -80,10 +137,6 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
     .filter((line) => line.qty > 0);
   const count = lines.reduce((sum, line) => sum + line.qty, 0);
   const total = lines.reduce((sum, line) => sum + line.qty * line.dish.price, 0);
-
-  useEffect(() => {
-    void readFoodProfile().then(setCustomer);
-  }, []);
 
   useEffect(() => {
     let stop = false;
@@ -114,6 +167,26 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
       clearInterval(id);
     };
   }, [tracked?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(id);
+  }, [open, choice]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      const windowHeight = Dimensions.get("window").height;
+      const overlap = Math.round(windowHeight - event.endCoordinates.screenY);
+      setKeyboardLift(Platform.OS === "android" && overlap > 24 ? overlap : 0);
+      if (dropoffFocused.current) setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 80);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardLift(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   function setQty(id: string, next: number) {
     setSent(false);
@@ -156,7 +229,12 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
       setOpen(false);
       setChoice(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
+      const message = caught instanceof Error ? caught.message : t("fail.generic");
+      if (message.includes("Telefon tasdiqlanmagan")) {
+        await clearFoodProfile();
+        onCustomer(null);
+      }
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -184,101 +262,10 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
   return (
     <Screen
       compact
+      scrollRef={pageScroll}
+      keyboardInsets
       footer={
-        <View className="bg-canvas px-4 pb-4">
-          {open ? (
-            <View className="mb-2 rounded-3xl bg-white px-4 py-3">
-              <Text className="text-base font-bold text-ink">{t("food.cart")}</Text>
-              {lines.length === 0 ? <Text className="mt-2 text-sm text-muted">{t("food.empty")}</Text> : null}
-              {lines.map((line) => (
-                <View key={line.dish.id} className="mt-3 flex-row items-center">
-                  <Image source={line.dish.image} style={{ width: 44, height: 44, borderRadius: 12 }} />
-                  <View className="ml-3 min-w-0 flex-1">
-                    <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
-                      {t(line.dish.nameKey)}
-                    </Text>
-                    <Text className="text-xs font-bold text-[#C2410C]">{formatMoney(line.dish.price)}</Text>
-                  </View>
-                  <Qty qty={line.qty} onChange={(next) => setQty(line.dish.id, next)} />
-                </View>
-              ))}
-              <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3">
-                <Text className="text-sm text-muted">{t("food.total")}</Text>
-                <Text className="text-base font-bold text-ink">{formatMoney(total)}</Text>
-              </View>
-              {customer ? (
-                <Text className="mt-3 text-sm font-semibold text-ink">
-                  {customer.name} · {formatUzPhone(customer.phone)}
-                </Text>
-              ) : (
-                <Text className="mt-3 text-sm text-muted">{t("food.sms_hint")}</Text>
-              )}
-              <TextInput
-                value={dropoff}
-                onChangeText={setDropoff}
-                placeholder={t("food.drop")}
-                placeholderTextColor="#98A2B3"
-                className="mt-2 rounded-2xl border border-line bg-[#F8FAFC] px-3 py-2.5 text-base text-ink"
-              />
-              {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
-              {!accepting ? <Text className="mt-2 text-sm font-semibold text-[#C2410C]">{t("food.closed_customer")}</Text> : null}
-              <View className="mt-3 flex-row">
-                <Pressable
-                  onPress={() => {
-                    setError(null);
-                    setChoice("pickup");
-                  }}
-                  disabled={busy || count === 0 || !accepting}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: choice === "pickup" }}
-                  className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "pickup" ? "border-[#121212] bg-[#121212]" : "border-[#D0D5DD] bg-white"}`}
-                >
-                  <Text
-                    numberOfLines={2}
-                    className={`text-center text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : choice === "pickup" ? "text-white" : "text-ink"}`}
-                  >
-                    {t("food.pickup_self")}
-                  </Text>
-                </Pressable>
-                <View className="w-2" />
-                <Pressable
-                  onPress={() => {
-                    setError(null);
-                    setChoice("courier");
-                  }}
-                  disabled={busy || count === 0 || !accepting}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: choice === "courier" }}
-                  className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "courier" ? "border-[#FF8A00] bg-[#FF8A00]" : "border-[#D0D5DD] bg-white"}`}
-                >
-                  <Text
-                    numberOfLines={2}
-                    className={`text-center text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : choice === "courier" ? "text-[#171717]" : "text-ink"}`}
-                  >
-                    {t("food.courier_go")}
-                  </Text>
-                </Pressable>
-              </View>
-              {choice ? (
-                <View className="mt-3 rounded-2xl bg-[#F8FAFC] px-3 py-3">
-                  <Text className="text-sm leading-5 text-ink">{t("food.confirm_q")}</Text>
-                  <Text className="mt-1 text-sm font-bold text-[#C2410C]">
-                    {choice === "pickup" ? t("food.pickup_self") : t("food.courier_go")}
-                  </Text>
-                  <Pressable
-                    onPress={() => void send(choice)}
-                    disabled={busy || count === 0 || !accepting}
-                    accessibilityRole="button"
-                    className={`mt-3 items-center rounded-2xl py-3 ${busy || count === 0 || !accepting ? "bg-slate-200" : "bg-[#121212] active:opacity-90"}`}
-                  >
-                    <Text className={`text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : "text-white"}`}>
-                      {busy ? "..." : t("food.confirm_send")}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
+        <View className="bg-canvas px-4 pb-4" style={{ marginBottom: keyboardLift }}>
           <Pressable
             onPress={() => setOpen((value) => !value)}
             accessibilityRole="button"
@@ -363,7 +350,11 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
           </View>
         </View>
 
-        {customer ? (
+        {!profileReady ? (
+          <View className="mt-4 items-center">
+            <ActivityIndicator color="#C2410C" />
+          </View>
+        ) : customer ? (
           <View className="mt-3 flex-row">
             <Pressable onPress={() => setMine(true)} accessibilityRole="button" className="flex-1 items-center rounded-full bg-[#121212] py-3">
               <Text className="text-sm font-bold text-white">{t("food.mine")}</Text>
@@ -371,7 +362,7 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
             <Pressable
               onPress={() => {
                 void clearFoodProfile().then(() => {
-                  setCustomer(null);
+                  onCustomer(null);
                   setMine(false);
                 });
               }}
@@ -390,11 +381,21 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
             onVerified={async (pass) => {
               const profile = { name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token };
               await saveFoodProfile(profile);
-              setCustomer(profile);
+              onCustomer(profile);
             }}
           />
         )}
-        {mine && customer ? <FoodMine token={customer.token} onClose={() => setMine(false)} /> : null}
+        {mine && customer ? (
+          <FoodMine
+            token={customer.token}
+            onClose={() => setMine(false)}
+            onExpired={() => {
+              void clearFoodProfile();
+              onCustomer(null);
+              setMine(false);
+            }}
+          />
+        ) : null}
 
         {!accepting ? (
           <View className="mt-3 rounded-2xl bg-[#121212] px-4 py-3">
@@ -416,6 +417,106 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
         {place.dishes.map((dish) => (
           <DishRow key={dish.id} dish={dish} qty={cart[dish.id] ?? 0} onChange={(next) => setQty(dish.id, next)} />
         ))}
+        {open ? (
+          <View className="mt-4 rounded-3xl bg-white px-4 py-3">
+            <Text className="text-base font-bold text-ink">{t("food.cart")}</Text>
+            {lines.length === 0 ? <Text className="mt-2 text-sm text-muted">{t("food.empty")}</Text> : null}
+            {lines.map((line) => (
+              <View key={line.dish.id} className="mt-3 flex-row items-center">
+                <Image source={line.dish.image} style={{ width: 44, height: 44, borderRadius: 12 }} />
+                <View className="ml-3 min-w-0 flex-1">
+                  <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
+                    {t(line.dish.nameKey)}
+                  </Text>
+                  <Text className="text-xs font-bold text-[#C2410C]">{formatMoney(line.dish.price)}</Text>
+                </View>
+                <Qty qty={line.qty} onChange={(next) => setQty(line.dish.id, next)} />
+              </View>
+            ))}
+            <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3">
+              <Text className="text-sm text-muted">{t("food.total")}</Text>
+              <Text className="text-base font-bold text-ink">{formatMoney(total)}</Text>
+            </View>
+            {customer ? (
+              <Text className="mt-3 text-sm font-semibold text-ink">
+                {customer.name} · {formatUzPhone(customer.phone)}
+              </Text>
+            ) : (
+              <Text className="mt-3 text-sm text-muted">{t("food.sms_hint")}</Text>
+            )}
+            <TextInput
+              value={dropoff}
+              onChangeText={setDropoff}
+              onFocus={() => {
+                dropoffFocused.current = true;
+                setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 120);
+              }}
+              onBlur={() => {
+                dropoffFocused.current = false;
+              }}
+              placeholder={t("food.drop")}
+              placeholderTextColor="#98A2B3"
+              className="mt-2 rounded-2xl border border-line bg-[#F8FAFC] px-3 py-2.5 text-base text-ink"
+            />
+            {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
+            {!accepting ? <Text className="mt-2 text-sm font-semibold text-[#C2410C]">{t("food.closed_customer")}</Text> : null}
+            <View className="mt-3 flex-row">
+              <Pressable
+                onPress={() => {
+                  setError(null);
+                  setChoice("pickup");
+                }}
+                disabled={busy || count === 0 || !accepting}
+                accessibilityRole="button"
+                accessibilityState={{ selected: choice === "pickup" }}
+                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "pickup" ? "border-[#121212] bg-[#121212]" : "border-[#D0D5DD] bg-white"}`}
+              >
+                <Text
+                  numberOfLines={2}
+                  className={`text-center text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : choice === "pickup" ? "text-white" : "text-ink"}`}
+                >
+                  {t("food.pickup_self")}
+                </Text>
+              </Pressable>
+              <View className="w-2" />
+              <Pressable
+                onPress={() => {
+                  setError(null);
+                  setChoice("courier");
+                }}
+                disabled={busy || count === 0 || !accepting}
+                accessibilityRole="button"
+                accessibilityState={{ selected: choice === "courier" }}
+                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "courier" ? "border-[#FF8A00] bg-[#FF8A00]" : "border-[#D0D5DD] bg-white"}`}
+              >
+                <Text
+                  numberOfLines={2}
+                  className={`text-center text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : choice === "courier" ? "text-[#171717]" : "text-ink"}`}
+                >
+                  {t("food.courier_go")}
+                </Text>
+              </Pressable>
+            </View>
+            {choice ? (
+              <View className="mt-3 rounded-2xl bg-[#F8FAFC] px-3 py-3">
+                <Text className="text-sm leading-5 text-ink">{t("food.confirm_q")}</Text>
+                <Text className="mt-1 text-sm font-bold text-[#C2410C]">
+                  {choice === "pickup" ? t("food.pickup_self") : t("food.courier_go")}
+                </Text>
+                <Pressable
+                  onPress={() => void send(choice)}
+                  disabled={busy || count === 0 || !accepting}
+                  accessibilityRole="button"
+                  className={`mt-3 items-center rounded-2xl py-3 ${busy || count === 0 || !accepting ? "bg-slate-200" : "bg-[#121212] active:opacity-90"}`}
+                >
+                  <Text className={`text-sm font-bold ${busy || count === 0 || !accepting ? "text-slate-500" : "text-white"}`}>
+                    {busy ? "..." : t("food.confirm_send")}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         <View className="h-4" />
       </View>
     </Screen>
@@ -463,7 +564,7 @@ function Qty({ qty, onChange }: { qty: number; onChange: (next: number) => void 
   );
 }
 
-function FoodMine({ token, onClose }: { token: string; onClose: () => void }) {
+function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () => void; onExpired?: () => void }) {
   const t = useT();
   const [rows, setRows] = useState<FoodTicket[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -473,12 +574,17 @@ function FoodMine({ token, onClose }: { token: string; onClose: () => void }) {
   const [drop, setDrop] = useState("");
   const [lines, setLines] = useState<{ name: string; qty: number }[]>([]);
 
+  const expiredRef = useRef(onExpired);
+  expiredRef.current = onExpired;
+
   const load = useCallback(async () => {
     try {
       setRows(await api.listMyFood(token));
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
+      const message = caught instanceof Error ? caught.message : t("fail.generic");
+      if (message.includes("Telefon tasdiqlanmagan")) expiredRef.current?.();
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -523,9 +629,11 @@ function FoodMine({ token, onClose }: { token: string; onClose: () => void }) {
     <View className="mt-3 rounded-3xl bg-white px-4 py-4">
       <View className="flex-row items-center">
         <Text className="flex-1 text-base font-bold text-ink">{t("food.mine")}</Text>
-        <Pressable onPress={onClose} accessibilityRole="button">
-          <Text className="text-sm font-semibold text-brand">{t("food.back")}</Text>
-        </Pressable>
+        {onClose ? (
+          <Pressable onPress={onClose} accessibilityRole="button">
+            <Text className="text-sm font-semibold text-brand">{t("food.back")}</Text>
+          </Pressable>
+        ) : null}
       </View>
       {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
       {loading && rows.length === 0 ? (

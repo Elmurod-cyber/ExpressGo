@@ -82,6 +82,7 @@ export type FoodOwnerCard = {
 
 export type TripCard = {
   id: string;
+  offer?: "rider" | "driver";
   passengerName: string;
   phoneMasked: string;
   from: string;
@@ -95,6 +96,8 @@ export type TripCard = {
   seats: number;
   price: number;
   note: string;
+  vehicle?: string;
+  photo?: string | null;
   at: number;
 };
 

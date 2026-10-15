@@ -256,43 +256,60 @@ export async function describePoint(point: MapPoint): Promise<string> {
   return label;
 }
 
+function placePart(value?: string | null): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function shortAddress(street?: string | null, area?: string | null): string {
+  const road = placePart(street);
+  const mahalla = placePart(area);
+  if (road && mahalla && foldName(road) !== foldName(mahalla)) return `${road}, ${mahalla}`;
+  return road || mahalla;
+}
+
+async function nominatimShort(point: MapPoint): Promise<string> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=uz&lat=${point.lat}&lon=${point.lng}`;
+  const response = await fetch(url, { headers: NOMINATIM_HEADERS });
+  if (!response.ok) return "";
+  const data = (await response.json()) as { address?: Record<string, string> };
+  const address = data.address;
+  const street = address?.road || address?.pedestrian || address?.footway;
+  const area =
+    address?.suburb ||
+    address?.neighbourhood ||
+    address?.quarter ||
+    address?.city_district ||
+    address?.residential ||
+    address?.village ||
+    address?.hamlet;
+  return shortAddress(street, area);
+}
+
+async function deviceShort(point: MapPoint): Promise<string> {
+  const rows = await Location.reverseGeocodeAsync({
+    latitude: point.lat,
+    longitude: point.lng,
+  });
+  const row = rows[0];
+  const district = placePart(row?.district);
+  const city = placePart(row?.city);
+  const region = placePart(row?.region);
+  const area = district && foldName(district) !== foldName(city) && foldName(district) !== foldName(region) ? district : "";
+  return shortAddress(row?.street, area);
+}
+
 async function describePointLabel(point: MapPoint): Promise<string> {
   try {
-    const rows = await Location.reverseGeocodeAsync({
-      latitude: point.lat,
-      longitude: point.lng,
-    });
-    const row = rows[0];
-    const label = [row?.street, row?.streetNumber, row?.district, row?.city, row?.region]
-      .filter(Boolean)
-      .join(", ");
+    const label = await nominatimShort(point);
+    if (label) return label;
+  } catch {
+    // Tarmoq yoki CORS.
+  }
+  try {
+    const label = await deviceShort(point);
     if (label) return label;
   } catch {
     // Webda teskari geokod yo'q.
-  }
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${point.lat}&lon=${point.lng}`;
-    const response = await fetch(url, { headers: NOMINATIM_HEADERS });
-    if (response.ok) {
-      const data = (await response.json()) as {
-        display_name?: string;
-        address?: Record<string, string>;
-      };
-      const address = data.address;
-      const short = [
-        address?.road,
-        address?.suburb || address?.neighbourhood || address?.village,
-        address?.city || address?.town,
-        address?.state,
-      ]
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(", ");
-      if (short) return short;
-      if (data.display_name) return data.display_name.split(",").slice(0, 3).join(",").trim();
-    }
-  } catch {
-    // Tarmoq yoki CORS.
   }
   return `Tanlangan nuqta (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
 }

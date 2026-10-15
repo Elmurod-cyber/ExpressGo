@@ -212,6 +212,54 @@ test("ikki yo'lovchi aralashmaydi, haydovchi ID bir xil qoladi", async () => {
   assert.throws(() => startTripPass("998900000044"));
 });
 
+test("haydovchi e'lon qoldiradi, narxsiz yo'lovchi kelishiladi", async () => {
+  const driver = registerTripAccount("driver", "Sardor", "998900000031");
+  const rider = registerTripAccount("rider", "Ali", "998900000032", await riderToken("998900000032", "Ali"));
+  const drive = await postTrip({
+    name: "Sardor",
+    phone: "998900000099",
+    accountId: driver.id,
+    from: "Andijon",
+    to: "Toshkent",
+    fromLat: 40.78,
+    fromLng: 72.34,
+    toLat: 41.31,
+    toLng: 69.24,
+    whenLabel: "juma 08:00",
+    seats: 3,
+    price: 80000,
+    note: "3 o'rin bo'sh",
+    vehicle: "Cobalt",
+    photo: "data:image/jpeg;base64,abc",
+  });
+  const ride = await postTrip({
+    name: "Ali",
+    phone: "998900000098",
+    accountId: rider.id,
+    from: "Shahrixon",
+    to: "Toshkent",
+    fromLat: 40.71,
+    fromLng: 71.06,
+    toLat: 41.31,
+    toLng: 69.24,
+    whenLabel: "ertaga",
+    seats: 1,
+    price: 0,
+    note: "",
+  });
+  const listed = await listTrips({ mode: "route", to: "Toshkent" });
+  assert.equal(listed.find((item) => item.id === drive.id)?.offer, "driver");
+  assert.equal(listed.find((item) => item.id === drive.id)?.vehicle, "Cobalt");
+  assert.equal(listed.find((item) => item.id === drive.id)?.photo, "data:image/jpeg;base64,abc");
+  assert.equal(listed.find((item) => item.id === drive.id)?.note, "3 o'rin bo'sh");
+  assert.equal(listed.find((item) => item.id === ride.id)?.offer, "rider");
+  assert.equal(listed.find((item) => item.id === ride.id)?.price, 0);
+  assert.equal((await listMyTrips(driver.id)).some((item) => item.id === drive.id), true);
+  assert.equal((await listMyTrips(driver.id)).some((item) => item.id === ride.id), false);
+  assert.equal((await listMyTrips(rider.id)).some((item) => item.id === ride.id), true);
+  assert.equal((await listMyTrips(rider.id)).some((item) => item.id === drive.id), false);
+});
+
 test("server yopiq bo'lsa mijoz ulanolmaydi", async () => {
   const server = createServer((_req, res) => {
     res.end();

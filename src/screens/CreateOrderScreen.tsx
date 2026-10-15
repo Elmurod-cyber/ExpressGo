@@ -10,7 +10,7 @@ import { describePoint, findPlace, keepFoundPlace, searchPlaces, type MapPoint, 
 import { roadTrip } from "../services/route";
 import { formatMoney } from "../services/money";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import { MAX_DROPOFFS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, readySlotOf, type ReadySlotId } from "../server/rules";
+import { COURIER_VEHICLES, MAX_DROPOFFS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, readySlotOf, type ReadySlotId } from "../server/rules";
 import type { SenderOrder, VehicleKind } from "../types";
 import { BrandMark } from "../components/BrandMark";
 
@@ -26,6 +26,21 @@ type PinMode = "pickup" | number;
 
 type DraftStop = { label: string; point: MapPoint | null };
 
+function localPhoneDigits(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits.startsWith("998") ? digits.slice(3) : digits;
+}
+
+function receiverPhone(raw?: string | null): string {
+  return localPhoneDigits(raw ?? "").length > 0 ? formatUzPhone(raw ?? "") : "";
+}
+
+function editReceiverPhone(next: string, prev: string): string {
+  if (!next.trim()) return "";
+  const formatted = prev ? editUzPhone(next, prev) : formatUzPhone(next);
+  return localPhoneDigits(formatted).length > 0 ? formatted : "";
+}
+
 export function CreateOrderScreen({ onDone, mode = "create", draft = null }: CreateOrderScreenProps) {
   const { account, t } = useSession();
   const mapRef = useRef<MapPickerHandle>(null);
@@ -36,7 +51,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
   const [pickup, setPickup] = useState(draft?.pickup ?? "");
   const [stops, setStops] = useState<DraftStop[]>(() => seedStops(draft));
   const customerName = draft?.customerName ?? "";
-  const [customerPhone, setCustomerPhone] = useState(formatUzPhone(draft?.customerPhone ?? ""));
+  const [customerPhone, setCustomerPhone] = useState(receiverPhone(draft?.customerPhone));
   const [fee, setFee] = useState(draft?.deliveryFee ? String(draft.deliveryFee) : "");
   const [suggestedFee, setSuggestedFee] = useState<number | null>(null);
   const [quoteDetail, setQuoteDetail] = useState<string | null>(null);
@@ -334,6 +349,10 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
       setError(t("create.address_need"));
       return;
     }
+    if (localPhoneDigits(customerPhone).length < 9) {
+      setError(t("create.receiver_phone_need"));
+      return;
+    }
     setBusy(true);
     setError(null);
     const dropoffs = stops.map((stop) => ({
@@ -549,8 +568,8 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
           </View>
 
           <Text className="mt-4 text-xs text-muted">{t("create.vehicle")}</Text>
-          <View className="mt-2 flex-row">
-            {(["walk", "moto", "car", "cargo"] as VehicleKind[]).map((kind) => (
+          <View className="mt-2 flex-row flex-wrap">
+            {COURIER_VEHICLES.map((kind) => (
               <Chip
                 key={kind}
                 label={VEHICLE_LABEL[kind]}
@@ -581,9 +600,9 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
 
           <LabeledBox
             icon="call-outline"
-            label={`${t("auth.phone")}:`}
+            label={`${t("create.receiver_phone")}:`}
             value={customerPhone}
-            onChangeText={(value) => setCustomerPhone((prev) => editUzPhone(value, prev))}
+            onChangeText={(value) => setCustomerPhone((prev) => editReceiverPhone(value, prev))}
             keyboardType="phone-pad"
           />
           <LabeledBox

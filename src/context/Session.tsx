@@ -49,9 +49,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       writeLocale(next);
       const applied = getLocale();
       setLocaleState(applied);
-      persistNow({ accountId: account?.id ?? null, dock, locale: applied, pushOn });
+      persistNow({ accountId: account?.id ?? null, account, dock, locale: applied, pushOn });
     },
-    [account?.id, dock, persistNow],
+    [account, dock, persistNow, pushOn],
   );
 
   const signIn = useCallback(async (seed: Account, token: string) => {
@@ -59,26 +59,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const nextDock: AppDock = seed.role === "courier" ? "courier" : "sender";
     setAccount(seed);
     setDockState(nextDock);
-    persistNow({ accountId: seed.id, dock: nextDock, locale: getLocale(), pushOn, token });
+    persistNow({ accountId: seed.id, account: seed, dock: nextDock, locale: getLocale(), pushOn, token });
     if (pushOn) void preparePush(seed.id);
   }, [persistNow, pushOn]);
 
   const replaceAccount = useCallback((next: Account) => {
-    setAccount((prev) => (prev && prev.id === next.id ? next : prev));
-  }, []);
+    if (!account || account.id !== next.id) return;
+    setAccount(next);
+    persistNow({ accountId: next.id, account: next, dock, locale, pushOn });
+  }, [account, dock, locale, persistNow, pushOn]);
 
   const setDock = useCallback(
     (next: AppDock) => {
       if (next === "admin") {
         if (!account?.isAdmin) return;
         setDockState("admin");
-        persistNow({ accountId: account.id, dock: "admin", locale, pushOn });
+        persistNow({ accountId: account.id, account, dock: "admin", locale, pushOn });
         return;
       }
       const role: AppDock = account?.role === "courier" ? "courier" : "sender";
       if (next !== role) return;
       setDockState(role);
-      persistNow({ accountId: account?.id ?? null, dock: role, locale, pushOn });
+      persistNow({ accountId: account?.id ?? null, account, dock: role, locale, pushOn });
     },
     [account, locale, pushOn, persistNow],
   );
@@ -88,16 +90,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setDockState("sender");
     setSessionToken("");
     void stopBackgroundGps();
-    persistNow({ accountId: null, dock: "sender", locale: getLocale(), pushOn, token: null });
+    persistNow({ accountId: null, account: null, dock: "sender", locale: getLocale(), pushOn, token: null });
   }, [persistNow, pushOn]);
 
   const setPushOn = useCallback(
     (on: boolean) => {
       setPushOnState(on);
-      persistNow({ accountId: account?.id ?? null, dock, locale, pushOn: on });
+      persistNow({ accountId: account?.id ?? null, account, dock, locale, pushOn: on });
       if (on) void preparePush(account?.id);
     },
-    [account?.id, dock, locale, persistNow],
+    [account, dock, locale, persistNow],
   );
 
   const setApiUrl = useCallback(
@@ -110,12 +112,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setSessionToken("");
         setAccount(null);
         setDockState("sender");
-        persistNow({ accountId: null, dock: "sender", locale, pushOn, apiUrl: next, token: null });
+        persistNow({ accountId: null, account: null, dock: "sender", locale, pushOn, apiUrl: next, token: null });
         return;
       }
-      persistNow({ accountId: account?.id ?? null, dock, locale, pushOn, apiUrl: next });
+      persistNow({ accountId: account?.id ?? null, account, dock, locale, pushOn, apiUrl: next });
     },
-    [account?.id, dock, locale, persistNow, pushOn],
+    [account, dock, locale, persistNow, pushOn],
   );
 
   useEffect(() => {
@@ -137,9 +139,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             const home: AppDock = seed.role === "courier" ? "courier" : "sender";
             setAccount(seed);
             setDockState(sess.dock === "admin" && seed.isAdmin ? "admin" : home);
-          } catch {
-            setSessionToken("");
-            setAccount(null);
+            await saveSession({ ...sess, accountId: seed.id, account: seed, dock: sess.dock === "admin" && seed.isAdmin ? "admin" : home });
+          } catch (caught) {
+            if (cancelled) return;
+            const gone = caught instanceof Error && caught.message.includes("Sessiya yo'q");
+            if (gone) {
+              setSessionToken("");
+              setAccount(null);
+              await saveSession({ ...sess, accountId: null, account: null, token: null });
+            } else if (sess.account) {
+              setAccount(sess.account);
+            }
           }
         }
       }

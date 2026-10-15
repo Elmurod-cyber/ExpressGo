@@ -6,7 +6,7 @@ import { BrandMark } from "../components/BrandMark";
 import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import { VEHICLE_LABEL } from "../server/rules";
+import { COURIER_VEHICLES, VEHICLE_LABEL } from "../server/rules";
 import type { OtpChallenge, Role, VehicleKind } from "../types";
 
 type AuthMode = "signup" | "login";
@@ -188,8 +188,8 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
           {signup && courier ? (
             <View className="mb-4">
               <Text className="mb-2 text-sm font-medium text-ink">{t("auth.vehicle")}</Text>
-              <View className="flex-row gap-2">
-                {(["walk", "moto", "car", "cargo"] as VehicleKind[]).map((kind) => {
+              <View className="flex-row flex-wrap gap-2">
+                {COURIER_VEHICLES.map((kind) => {
                   const selected = vehicle === kind;
                   return (
                     <Pressable
@@ -197,18 +197,16 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
                       onPress={() => setVehicle(kind)}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
-                      className={`flex-1 items-center rounded-2xl py-3 ${selected ? "bg-ink" : "bg-canvas"}`}
+                      className={`items-center rounded-2xl px-3 py-3 ${selected ? "bg-ink" : "bg-canvas"}`}
                     >
-                      <Text className={`text-sm font-semibold ${selected ? "text-white" : "text-ink"}`}>
+                      <Text className={`text-center text-sm font-semibold ${selected ? "text-white" : "text-ink"}`}>
                         {VEHICLE_LABEL[kind]}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-              <Text className="mt-2 text-xs text-muted">
-                {vehicle === "walk" ? t("auth.docs_walk") : t("auth.docs_drive")}
-              </Text>
+              <Text className="mt-2 text-xs text-muted">{t("auth.docs_drive")}</Text>
             </View>
           ) : null}
 

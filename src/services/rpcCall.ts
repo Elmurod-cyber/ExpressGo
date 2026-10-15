@@ -10,6 +10,8 @@ export async function postRpc<T>(
   unreachable: string,
 ): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -20,9 +22,12 @@ export async function postRpc<T>(
       method: "POST",
       headers,
       body: JSON.stringify({ method, args }),
+      signal: controller.signal,
     });
   } catch {
     throw new Error(unreachable);
+  } finally {
+    clearTimeout(timer);
   }
   const data = (await response.json().catch(() => ({}))) as { result?: T; error?: string };
   if (!response.ok) {
