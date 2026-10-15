@@ -60,7 +60,12 @@ function useTempRepo() {
   return repo;
 }
 
-async function signIn(role: "sender" | "courier", phone: string, name: string, vehicle?: "walk"): Promise<AuthSession> {
+async function signIn(
+  role: "sender" | "courier",
+  phone: string,
+  name: string,
+  vehicle?: "walk" | "moto" | "car" | "cargo",
+): Promise<AuthSession> {
   await registerAccount({ role, name, phone, vehicle, deposit: 900000 });
   await requestLogin({ role, phone });
   const code = readDevOtp(phone);
@@ -163,6 +168,27 @@ test("SMS sozlanmasa sinov kodi 1234 qabul qilinadi", async () => {
   } finally {
     process.env.EG_OTP_DEV = "1";
   }
+});
+
+test("admin hujjat bo'limi kutilayotgan rasmlarni ko'rsatadi", async () => {
+  const repo = useTempRepo();
+  const courier = await signIn("courier", "998900000031", "Karim", "car");
+  const admin = await signIn("sender", "998900000032", "Admin");
+  const adminUser = await repo.readUser(admin.account.id);
+  assert.ok(adminUser);
+  adminUser.isAdmin = true;
+  await repo.writeUser(adminUser);
+  const adminActor = { ...actorOf(admin.account), isAdmin: true };
+  await submitDoc(actorOf(courier.account), "passport", "file://passport");
+  await submitDoc(actorOf(courier.account), "license", "file://license");
+  await submitDoc(actorOf(courier.account), "vehicle", "file://vehicle");
+  const board = await adminBoard(adminActor);
+  assert.equal(board.reviews.length, 3);
+  assert.equal(board.people.find((person) => person.id === courier.account.id)?.docsPending, 3);
+  await reviewDoc(adminActor, courier.account.id, "passport", true);
+  const after = await adminBoard(adminActor);
+  assert.equal(after.reviews.length, 2);
+  assert.equal(after.reviews.some((item) => item.kind === "passport"), false);
 });
 
 test("vakolatsiz foydalanuvchi admin amalini bajara olmaydi", async () => {

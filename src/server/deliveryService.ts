@@ -27,6 +27,7 @@ import {
 import type {
   Account,
   AdminBoard,
+  AdminDocReview,
   CourierBoard,
   CourierDocKind,
   CourierDocs,
@@ -159,6 +160,38 @@ function docUri(user: DeliveryUser, kind: CourierDocKind): string | null {
   if (kind === "license") return user.licenseUri;
   if (kind === "vehicle") return user.vehicleDocUri;
   return user.passportUri;
+}
+
+function docNote(user: DeliveryUser, kind: CourierDocKind): string | null {
+  if (kind === "license") return user.licenseNote;
+  if (kind === "vehicle") return user.vehicleNote;
+  return user.passportNote;
+}
+
+function docReviews(users: DeliveryUser[]): AdminDocReview[] {
+  const kinds: CourierDocKind[] = ["passport", "license", "vehicle"];
+  const rows: AdminDocReview[] = [];
+  for (const user of users) {
+    if (user.role !== "courier" || !user.vehicle) continue;
+    const needed = docsNeeded(user.vehicle);
+    for (const kind of kinds) {
+      if (!needed.includes(kind)) continue;
+      const status = docStatus(user, kind);
+      const uri = docUri(user, kind);
+      if (!uri || (status !== "pending" && status !== "rejected")) continue;
+      rows.push({
+        courierId: user.id,
+        who: user.name,
+        phone: user.phone,
+        vehicle: user.vehicle,
+        kind,
+        uri,
+        status,
+        note: docNote(user, kind),
+      });
+    }
+  }
+  return rows.sort((left, right) => (left.status === right.status ? 0 : left.status === "pending" ? -1 : 1));
 }
 
 function docsOf(user: DeliveryUser): CourierDocs | null {
@@ -1068,7 +1101,7 @@ export async function adminBoard(actor: Actor): Promise<AdminBoard> {
     ads: [],
     cashoutTotal: 0,
     payouts: [],
-    reviews: [],
+    reviews: docReviews(users),
     sms: [],
     pushes: [],
   };
