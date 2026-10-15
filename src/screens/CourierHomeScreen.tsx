@@ -52,7 +52,7 @@ type ListTab = "active" | "map" | "history";
 type Opened = { kind: "order" | "errand"; id: string };
 type ProofDraft = { id: string; pickup?: string; dropoff?: string; signature?: string };
 
-const pingSound = require("../../assets/ping.wav");
+const offerSound = require("../../assets/sounds/order_alert.mp3");
 
 const emptyBoard: CourierBoard = {
   active: null,
@@ -109,7 +109,7 @@ export function CourierHomeScreen({
   const [mapOpen, setMapOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pingPlayer = useAudioPlayer(pingSound);
+  const pingPlayer = useAudioPlayer(offerSound);
 
   const load = useCallback(async () => {
     if (!userId) return;
