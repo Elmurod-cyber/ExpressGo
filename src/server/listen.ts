@@ -99,8 +99,9 @@ void (async () => {
       console.log(`Tarmoq: http://${ip}:${PORT}`);
     }
     console.log("Ikki telefon shu manzilni Profilga yozadi.");
-    if (!process.env.SMS_WEBHOOK_URL?.trim() && process.env.EG_OTP_DEV !== "1") {
-      console.warn("SMS_WEBHOOK_URL yo'q. Chiqishdan keyin kirish kodi yuborilmaydi.");
+    const eskiz = Boolean(process.env.ESKIZ_EMAIL?.trim() && process.env.ESKIZ_SECRET?.trim());
+    if (!eskiz && !process.env.SMS_WEBHOOK_URL?.trim() && process.env.EG_OTP_DEV !== "1") {
+      console.warn("SMS yo'q. Render Environment ga ESKIZ_EMAIL va ESKIZ_SECRET qo'ying.");
     }
   });
 })();

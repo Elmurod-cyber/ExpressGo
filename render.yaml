@@ -8,6 +8,12 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: ESKIZ_EMAIL
+        sync: false
+      - key: ESKIZ_SECRET
+        sync: false
+      - key: ESKIZ_FROM
+        sync: false
       - key: SMS_WEBHOOK_URL
         sync: false
       - key: SMS_WEBHOOK_TOKEN

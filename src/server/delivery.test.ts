@@ -35,9 +35,13 @@ import type { Account, AuthSession } from "../types";
 const previousOtp = process.env.EG_OTP_DEV;
 const previousAdmin = process.env.EG_ADMIN_PHONES;
 const previousSms = process.env.SMS_WEBHOOK_URL;
+const previousEskizEmail = process.env.ESKIZ_EMAIL;
+const previousEskizSecret = process.env.ESKIZ_SECRET;
 process.env.EG_OTP_DEV = "1";
 process.env.EG_ADMIN_PHONES = "";
 delete process.env.SMS_WEBHOOK_URL;
+delete process.env.ESKIZ_EMAIL;
+delete process.env.ESKIZ_SECRET;
 
 function actorOf(account: Account): Actor {
   return {
@@ -71,6 +75,10 @@ test.after(() => {
   process.env.EG_ADMIN_PHONES = previousAdmin;
   if (previousSms === undefined) delete process.env.SMS_WEBHOOK_URL;
   else process.env.SMS_WEBHOOK_URL = previousSms;
+  if (previousEskizEmail === undefined) delete process.env.ESKIZ_EMAIL;
+  else process.env.ESKIZ_EMAIL = previousEskizEmail;
+  if (previousEskizSecret === undefined) delete process.env.ESKIZ_SECRET;
+  else process.env.ESKIZ_SECRET = previousEskizSecret;
   useDeliveryRepository(null, false);
 });
 
@@ -141,6 +149,8 @@ test("SMS sozlanmasa kirish kodi chiqmaydi", async () => {
   await registerAccount({ role: "sender", name: "Ali", phone: "998900000004" });
   process.env.EG_OTP_DEV = "";
   delete process.env.SMS_WEBHOOK_URL;
+  delete process.env.ESKIZ_EMAIL;
+  delete process.env.ESKIZ_SECRET;
   try {
     await assert.rejects(() => requestLogin({ role: "sender", phone: "998900000004" }), /SMS sozlanmagan/);
     assert.equal(readDevOtp("998900000004"), null);
