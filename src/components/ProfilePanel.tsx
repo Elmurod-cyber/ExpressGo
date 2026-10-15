@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSession, useT } from "../context/Session";
 import { LANGUAGE_SWITCH_ENABLED } from "../i18n";
 import { LanguageSwitch } from "./LanguageSwitch";
-import { ServerUrlField } from "./ServerUrlField";
 import { api } from "../services/api";
 import { formatMoney } from "../services/money";
 import { takeProofPhoto } from "../services/photo";
@@ -94,8 +93,6 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
           <View className={`h-5 w-5 rounded-full bg-white ${pushOn ? "self-end" : "self-start"}`} />
         </View>
       </Pressable>
-
-      <ServerUrlField />
 
       <Field label={t("auth.name")}>
         <TextInput
