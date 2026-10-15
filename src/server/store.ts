@@ -1152,7 +1152,7 @@ function startPing(job: GeoJob, courier: UserRecord) {
   if (prev === courier.id) return;
   const meta = jobMeta(job);
   if (meta) {
-    pushNote(courier.id, "Sizga taklif", `${meta.item} yaqin. 15 soniya ichida qabul qiling.`, meta.id, meta.kind);
+    pushNote(courier.id, "Sizga taklif", `${meta.item} yaqin. ${PING_MS / 1000} soniya ichida qabul qiling.`, meta.id, meta.kind);
   }
 }
 
