@@ -21,10 +21,16 @@ function loadNotifications(): NotificationsModule | null {
 
 const Notifications = loadNotifications();
 
+function isLoudOffer(title: string | null, data: Record<string, unknown> | undefined): boolean {
+  const orderId = data?.orderId;
+  return (typeof orderId === "string" && orderId.length > 0) || title === "Yangi Buyurtma!";
+}
+
 if (Notifications) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: true,
+    handleNotification: async (notification) => ({
+      // Ilova ochiq: taklif ovozi ekranda chaladi. Shu xabar ovozi qo'shilmasin.
+      shouldPlaySound: !isLoudOffer(notification.request.content.title, notification.request.content.data),
       shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
