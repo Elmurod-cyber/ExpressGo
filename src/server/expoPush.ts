@@ -1,4 +1,10 @@
-export type ExpoPush = { to: string; title: string; body: string; data?: Record<string, unknown> };
+export type ExpoPush = {
+  to: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  loud?: boolean;
+};
 
 export function expoPushBody(items: ExpoPush[]) {
   return items
@@ -8,9 +14,9 @@ export function expoPushBody(items: ExpoPush[]) {
       title: item.title,
       body: item.body,
       data: item.data ?? {},
-      sound: "order_alert.mp3",
-      channelId: "order-alert",
-      priority: "high" as const,
+      sound: item.loud ? "order_alert.mp3" : "default",
+      channelId: item.loud ? "order-alert" : "express-go",
+      priority: item.loud ? ("high" as const) : ("default" as const),
     }));
 }
 
@@ -47,6 +53,7 @@ export async function sendPushNotification(
   title: string,
   body: string,
   data: Record<string, unknown> = {},
+  loud = false,
 ) {
-  await sendExpoPushes([{ to: expoPushToken, title, body, data }]);
+  await sendExpoPushes([{ to: expoPushToken, title, body, data, loud }]);
 }

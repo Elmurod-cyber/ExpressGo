@@ -269,13 +269,14 @@ async function notifyAccount(
   title: string,
   body: string,
   data: Record<string, unknown> = {},
+  loud = false,
 ) {
   if (!userId) return;
   try {
     const user = await repo().readUser(userId);
     const token = user?.pushToken?.trim() ?? "";
     if (!token) return;
-    await sendPushNotification(token, title, body, data);
+    await sendPushNotification(token, title, body, data, loud);
   } catch (caught) {
     console.warn(caught instanceof Error ? caught.message : "Push yuborilmadi.");
   }
@@ -292,7 +293,7 @@ async function notifyOpenCouriers(order: DeliveryOrder) {
     if (now - courier.locationAt > GPS_STALE_MS) continue;
     const km = kmBetween(pickup, { lat: courier.lat, lng: courier.lng });
     if (km > matchRadiusKm(courier.vehicle)) continue;
-    await notifyAccount(courier.id, "Yangi Buyurtma!", `${order.pickup} → ${order.dropoff}`, { orderId: order.id });
+    await notifyAccount(courier.id, "Yangi Buyurtma!", `${order.pickup} → ${order.dropoff}`, { orderId: order.id }, true);
   }
 }
 

@@ -29,7 +29,7 @@ import {
   useDeliveryRepository,
   verifyLogin,
 } from "./deliveryService";
-import { setExpoPushSender } from "./expoPush";
+import { expoPushBody, setExpoPushSender } from "./expoPush";
 import { readDevOtp } from "./sms";
 import { assertOnline, postRpc } from "../services/rpcCall";
 import type { Account, AuthSession } from "../types";
@@ -381,11 +381,17 @@ test("smenasi ochiq kuryerga yopiq ilova xabari boradi", async () => {
       pickupLng: 71.06,
       deliveryFee: 1,
     });
-    assert.equal(sent.some((item) => item.to === "ExponentPushToken[on]" && item.title === "Yangi Buyurtma!"), true);
+    const offer = sent.find((item) => item.to === "ExponentPushToken[on]" && item.title === "Yangi Buyurtma!");
+    assert.ok(offer);
+    assert.equal(expoPushBody([offer])[0]?.channelId, "order-alert");
+    assert.equal(expoPushBody([offer])[0]?.sound, "order_alert.mp3");
     assert.equal(sent.some((item) => item.to === "ExponentPushToken[off]"), false);
     sent.length = 0;
     await acceptDelivery(actorOf(on.account), order.id);
-    assert.equal(sent.some((item) => item.to === "ExponentPushToken[sender]" && item.title === "Kuryer qabul qildi"), true);
+    const accepted = sent.find((item) => item.to === "ExponentPushToken[sender]" && item.title === "Kuryer qabul qildi");
+    assert.ok(accepted);
+    assert.equal(expoPushBody([accepted])[0]?.channelId, "express-go");
+    assert.equal(expoPushBody([accepted])[0]?.sound, "default");
   } finally {
     setExpoPushSender(null);
   }
