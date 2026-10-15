@@ -115,6 +115,14 @@ export function CourierHomeScreen({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingPlayer = useAudioPlayer(offerSound);
 
+  function stopOfferSound() {
+    try {
+      pingPlayer.pause();
+    } catch {
+      // Ovoz allaqachon tugagan bo'lishi mumkin.
+    }
+  }
+
   const load = useCallback(async () => {
     if (!userId) return;
     try {
@@ -399,7 +407,8 @@ export function CourierHomeScreen({
   async function advanceOrder() {
     if (!account || !liveOrder) return;
     if (liveOrder.status === "posted") {
-      await run(() => api.acceptOrder(account.id, liveOrder.id));
+      const ok = await run(() => api.acceptOrder(account.id, liveOrder.id));
+      if (ok) stopOfferSound();
       return;
     }
     if (liveOrder.status === "accepted") {
@@ -434,7 +443,8 @@ export function CourierHomeScreen({
   async function advanceErrand() {
     if (!account || !liveErrand) return;
     if (errandOffer) {
-      await run(() => api.acceptErrand(account.id, errandOffer.id));
+      const ok = await run(() => api.acceptErrand(account.id, errandOffer.id));
+      if (ok) stopOfferSound();
       return;
     }
     if (errandJob?.status === "accepted") {
