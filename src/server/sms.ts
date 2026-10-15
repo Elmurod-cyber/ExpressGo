@@ -11,6 +11,14 @@ export function otpConfigured(): "dev" | "eskiz" | "webhook" | "off" {
   return "off";
 }
 
+export const SMS_TEST_CODE = "1234";
+
+/** Eskiz shartnomasi yo'q. ESKIZ_LIVE=1 bo'lmaguncha SMS ketmaydi, kod 1234. */
+export function smsTestMode(): boolean {
+  if (process.env.EG_OTP_DEV === "1") return false;
+  return process.env.ESKIZ_LIVE !== "1";
+}
+
 function maskPhone(phone: string): string {
   const value = digits(phone);
   if (value.length < 6) return "***";

@@ -1,5 +1,5 @@
 import { kmBetween, type MapPoint } from "../services/distance";
-import { sendLoginCode } from "./sms";
+import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { sameHash, sha256 } from "./sha256";
 import { listingArea } from "./places";
 import { roadRoute, roadTrip, routeTargetKey } from "../services/route";
@@ -1698,12 +1698,13 @@ const OTP_SENT = "Kirish kodi yuborildi.";
 
 /** Eski qurilma xotirasi. Haqiqiy SMS emas. Umumiy server deliveryService orqali yuboradi. */
 function sendOtp(_phone: string, _code: string) {
-  if (process.env.EG_OTP_DEV === "1") return;
+  if (process.env.EG_OTP_DEV === "1" || smsTestMode()) return;
   fail("SMS sozlanmagan. Kirish kodi yuborilmadi.");
 }
 
 function issueOtp(role: Role, phone: string): OtpChallenge {
-  const code = String(1000 + Math.floor(Math.random() * 9000));
+  const test = smsTestMode();
+  const code = test ? SMS_TEST_CODE : String(1000 + Math.floor(Math.random() * 9000));
   const until = Date.now() + OTP_MS;
   const existing = otps.find((item) => item.role === role && item.phone === phone);
   if (existing) {
@@ -1714,7 +1715,7 @@ function issueOtp(role: Role, phone: string): OtpChallenge {
     otps.push({ phone, role, code, until, tries: 0 });
   }
   sendOtp(phone, code);
-  return { phone, until };
+  return test ? { phone, until, testCode: SMS_TEST_CODE } : { phone, until };
 }
 
 export function requestOtp(input: { role: Role; phone: string }): OtpChallenge {
@@ -3589,9 +3590,10 @@ export async function requestGuestCode(kind: string, phone: string): Promise<Otp
   const role = guestKind(kind);
   const key = phoneKey(phone);
   if (key.length < 9) fail("Telefon raqamini to'liq yozing.");
-  const code = String(1000 + (Number.parseInt(randomHex(2), 16) % 9000));
+  const test = smsTestMode();
+  const code = test ? SMS_TEST_CODE : String(1000 + (Number.parseInt(randomHex(2), 16) % 9000));
   const until = Date.now() + GUEST_OTP_MS;
-  await sendLoginCode(key, code);
+  if (!test) await sendLoginCode(key, code);
   const hash = sha256(code);
   const found = guestOtps.find((item) => item.kind === role && item.phone === key);
   if (found) {
@@ -3599,7 +3601,7 @@ export async function requestGuestCode(kind: string, phone: string): Promise<Otp
     found.until = until;
     found.tries = 0;
   } else guestOtps.push({ kind: role, phone: key, codeHash: hash, until, tries: 0 });
-  return { phone: key, until };
+  return test ? { phone: key, until, testCode: SMS_TEST_CODE } : { phone: key, until };
 }
 
 export async function verifyGuestCode(kind: string, phone: string, code: string, name: string): Promise<GuestPass> {

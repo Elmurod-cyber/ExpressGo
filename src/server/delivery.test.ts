@@ -144,15 +144,21 @@ test("ro'yxatdan o'tish kuryer egizagi va depozit yaratmaydi", async () => {
   assert.equal(courier.balance, 0);
 });
 
-test("SMS sozlanmasa kirish kodi chiqmaydi", async () => {
+test("SMS sozlanmasa sinov kodi 1234 qabul qilinadi", async () => {
   useTempRepo();
   await registerAccount({ role: "sender", name: "Ali", phone: "998900000004" });
   process.env.EG_OTP_DEV = "";
   delete process.env.SMS_WEBHOOK_URL;
   delete process.env.ESKIZ_EMAIL;
   delete process.env.ESKIZ_SECRET;
+  delete process.env.ESKIZ_LIVE;
   try {
-    await assert.rejects(() => requestLogin({ role: "sender", phone: "998900000004" }), /SMS sozlanmagan/);
+    const challenge = await requestLogin({ role: "sender", phone: "998900000004" });
+    assert.equal(challenge.testCode, "1234");
+    await assert.rejects(() => verifyLogin({ role: "sender", phone: "998900000004", code: "0000" }), /noto'g'ri/);
+    const session = await verifyLogin({ role: "sender", phone: "998900000004", code: "1234" });
+    assert.equal(session.account.phone, "998900000004");
+    assert.ok(session.token);
     assert.equal(readDevOtp("998900000004"), null);
   } finally {
     process.env.EG_OTP_DEV = "1";

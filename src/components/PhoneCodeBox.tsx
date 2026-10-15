@@ -23,6 +23,7 @@ export function PhoneCodeBox({
   const [phone, setPhone] = useState(formatUzPhone(""));
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const button = tone === "orange" ? "bg-[#C2410C]" : "bg-brand";
@@ -35,7 +36,8 @@ export function PhoneCodeBox({
     setBusy(true);
     setError(null);
     try {
-      await api.requestGuestCode(kind, phone);
+      const challenge = await api.requestGuestCode(kind, phone);
+      setTestCode(challenge.testCode ?? null);
       setSent(true);
       setCode("");
     } catch (caught) {
@@ -82,7 +84,9 @@ export function PhoneCodeBox({
       />
       {sent ? (
         <>
-          <Text className="mt-3 text-sm text-muted">{t("otp.body", { phone })}</Text>
+          <Text className="mt-3 text-sm text-muted">
+            {testCode ? t("otp.test_hint", { code: testCode }) : t("otp.body", { phone })}
+          </Text>
           <TextInput
             value={code}
             onChangeText={setCode}

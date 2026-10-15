@@ -1,7 +1,7 @@
 import "./global.css";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider } from "./src/context/Session";
 import { AreaProvider } from "./src/context/Area";
@@ -16,12 +16,18 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider style={{ flex: 1 }}>
+    <SafeAreaProvider style={{ flex: 1, width: "100%" }}>
       <StatusBar style="dark" />
       <SessionProvider>
         <AreaProvider>
-          <View className="flex-1 items-center bg-[#D5DBE6]">
-            <View className="h-full w-full max-w-md flex-1 bg-canvas">
+          <View
+            className={Platform.OS === "web" ? "flex-1 items-center bg-[#D5DBE6]" : "w-full flex-1"}
+            style={Platform.OS === "web" ? undefined : { flex: 1, width: "100%", backgroundColor: "#171717" }}
+          >
+            <View
+              className={Platform.OS === "web" ? "h-full w-full max-w-md flex-1 bg-canvas" : "h-full w-full flex-1"}
+              style={Platform.OS === "web" ? undefined : { flex: 1, width: "100%" }}
+            >
               <RootNavigator />
             </View>
           </View>

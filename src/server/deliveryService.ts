@@ -6,7 +6,7 @@ import {
   type DeliveryRepository,
   type DeliveryUser,
 } from "./deliveryRepo";
-import { sendLoginCode } from "./sms";
+import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { kmBetween } from "../services/distance";
 import { sendPushNotification } from "./expoPush";
 import { setAccountNotify } from "./notifyBus";
@@ -310,11 +310,12 @@ async function issueOtp(role: Role, phone: string): Promise<OtpChallenge> {
   const store = repo();
   const user = await store.readUserByPhone(phone, role);
   if (!user) fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
-  const code = String(randomInt(1000, 10000));
+  const test = smsTestMode();
+  const code = test ? SMS_TEST_CODE : String(randomInt(1000, 10000));
   const until = Date.now() + OTP_MS;
-  await sendLoginCode(phone, code);
+  if (!test) await sendLoginCode(phone, code);
   await store.writeOtp({ phone, role, codeHash: sha256(code), expiresAt: until, tries: 0 });
-  return { phone, until };
+  return test ? { phone, until, testCode: SMS_TEST_CODE } : { phone, until };
 }
 
 export async function requestLogin(input: { role: Role | string; phone: string }): Promise<OtpChallenge> {

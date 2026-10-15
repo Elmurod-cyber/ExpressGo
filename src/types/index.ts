@@ -519,6 +519,7 @@ export type SmsOutbox = {
 export type OtpChallenge = {
   phone: string;
   until: number;
+  testCode?: string;
 };
 
 export type GuestPass = {

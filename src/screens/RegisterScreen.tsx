@@ -109,7 +109,9 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
               <BrandMark size={88} />
             </View>
             <Text className="text-center text-3xl font-bold text-ink">{t("otp.title")}</Text>
-            <Text className="mt-2 text-center text-sm text-muted">{t("otp.body", { phone: challenge.phone })}</Text>
+            <Text className="mt-2 text-center text-sm text-muted">
+              {challenge.testCode ? t("otp.test_hint", { code: challenge.testCode }) : t("otp.body", { phone: challenge.phone })}
+            </Text>
           </View>
           <View className="mt-6 rounded-[28px] bg-white px-5 py-6">
             {typeof __DEV__ !== "undefined" && __DEV__ ? (
