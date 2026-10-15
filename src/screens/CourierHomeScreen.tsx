@@ -830,7 +830,7 @@ export function CourierHomeScreen({
             </Pressable>
             {account?.docs && account.vehicle ? (
               <View className="mt-3 flex-row items-center justify-between rounded-3xl bg-white px-4 py-3">
-                <Text className="text-sm font-semibold text-ink">{t("duty.shift")}</Text>
+                <Text className="text-lg font-bold text-ink">{t("duty.shift")}</Text>
                 <Pressable
                   onPress={() => void toggleShift(!account.shiftOn)}
                   accessibilityRole="switch"
