@@ -90,10 +90,14 @@ export function CourierHomeScreen({
   lockedPage,
   showTabBar = true,
   onBack,
+  openActive = false,
+  onActiveOpened,
 }: {
   lockedPage?: CourierPage;
   showTabBar?: boolean;
   onBack?: () => void;
+  openActive?: boolean;
+  onActiveOpened?: () => void;
 } = {}) {
   const { account, replaceAccount, t } = useSession();
   const insets = useSafeAreaInsets();
@@ -321,6 +325,15 @@ export function CourierHomeScreen({
   const showingActive = Boolean(
     activeJump && page === "orders" && opened?.kind === activeJump.kind && opened.id === activeJump.id,
   );
+
+  const activeId = activeJump?.id ?? null;
+  const activeKind = activeJump?.kind ?? null;
+  useEffect(() => {
+    if (!openActive || !activeId || !activeKind) return;
+    setOpened({ kind: activeKind, id: activeId });
+    setPage("orders");
+    onActiveOpened?.();
+  }, [activeId, activeKind, onActiveOpened, openActive]);
   const pingUntil = liveOrder?.offeredToYou
     ? liveOrder.pingUntil
     : errandOffer?.offeredToYou
@@ -962,7 +975,13 @@ export function CourierHomeScreen({
         accessibilityRole="button"
         accessibilityLabel={t("courier.mine_order")}
         className="absolute right-4 flex-row items-center rounded-full bg-[#C2410C] px-4 py-3 active:opacity-90"
-        style={{ bottom: (showTabBar ? Math.max(insets.bottom, 8) + 68 : 16), elevation: 6 }}
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: Math.max(insets.bottom, 8) + (showTabBar ? 76 : 68),
+          zIndex: 50,
+          elevation: 12,
+        }}
       >
         <Ionicons name="cube" size={18} color="#FFFFFF" />
         <Text className="ml-2 text-sm font-bold text-white" numberOfLines={1}>

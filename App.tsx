@@ -9,7 +9,24 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { downloadUpdateInBackground } from "./src/services/appUpdates";
 import { registerForPushNotificationsAsync } from "./src/services/push";
 
+function useScreenAwake() {
+  useEffect(() => {
+    let release: (() => void) | null = null;
+    try {
+      const { activateKeepAwakeAsync, deactivateKeepAwake } = require("expo-keep-awake") as typeof import("expo-keep-awake");
+      void activateKeepAwakeAsync("expressgo").catch(() => undefined);
+      release = () => {
+        void deactivateKeepAwake("expressgo").catch(() => undefined);
+      };
+    } catch {
+      release = null;
+    }
+    return () => release?.();
+  }, []);
+}
+
 export default function App() {
+  useScreenAwake();
   useEffect(() => {
     void downloadUpdateInBackground();
     void registerForPushNotificationsAsync();
