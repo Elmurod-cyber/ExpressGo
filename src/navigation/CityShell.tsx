@@ -114,7 +114,7 @@ function AccountProfile() {
     return <RegisterScreen role={role} onBack={() => setRole(null)} />;
   }
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pb-6 pt-3">
         <ProfilePanel />
         <AdminEntry />
@@ -126,7 +126,7 @@ function AccountProfile() {
 function RoleGate({ onPick }: { onPick: (role: Role) => void }) {
   const t = useT();
   return (
-    <Screen ad={null} compact surface="bg-[#171717]">
+    <Screen compact surface="bg-[#171717]">
       <View className="px-5 pt-6">
         <Text className="text-xl font-bold text-white">{t("nav.need_account")}</Text>
         <Pressable

@@ -237,7 +237,7 @@ export function CreateErrandScreen({ onDone, onBack }: CreateErrandScreenProps) 
   }
 
   return (
-    <Screen ad="market">
+    <Screen>
       <View className="px-4 pt-3">
         <Pressable onPress={onBack} accessibilityRole="button" className="self-start py-2">
           <Text className="text-sm font-semibold text-brand">{t("errand.back")}</Text>

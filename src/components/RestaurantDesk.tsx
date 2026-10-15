@@ -98,7 +98,7 @@ export function RestaurantDesk({
   const current = lanes.find((item) => item.id === lane) ?? lanes[0];
 
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pt-2">
         <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
           <Ionicons name="chevron-back" size={18} color="#C2410C" />

@@ -257,7 +257,7 @@ export function AdminHomeScreen() {
   }, [board, t]);
 
   return (
-    <Screen ad="kitchen">
+    <Screen>
       <View className="px-4 pt-3">
         <View className="flex-row items-center">
           <Pressable

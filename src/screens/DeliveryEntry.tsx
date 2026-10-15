@@ -25,7 +25,7 @@ export function DeliveryEntry({
 }) {
   const t = useT();
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pb-6 pt-2">
         <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
           <Ionicons name="chevron-back" size={20} color="#C2410C" />

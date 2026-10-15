@@ -202,7 +202,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
   }
 
   return (
-    <Screen ad={null} compact surface="bg-[#171717]">
+    <Screen compact surface="bg-[#171717]">
       <StatusBar style="light" />
       <View className="px-5 pb-6 pt-1">
         <View className="flex-row items-center">

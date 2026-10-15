@@ -77,7 +77,7 @@ export function IntercityScreen({
   }
 
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-5 pt-2">
         <Pressable onPress={leave} accessibilityRole="button" className="mb-3 flex-row items-center">
           <Ionicons name="chevron-back" size={20} color="#155EEF" />
@@ -148,7 +148,7 @@ export function TripEntry({
 }) {
   const t = useT();
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pt-2 pb-6">
         <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
           <Ionicons name="chevron-back" size={20} color="#C2410C" />

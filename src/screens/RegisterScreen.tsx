@@ -88,7 +88,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
 
   if (challenge) {
     return (
-      <Screen ad={null}>
+      <Screen>
         <View className="px-5 pt-2">
           <View className="flex-row justify-end">
             <Pressable
@@ -146,7 +146,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
   }
 
   return (
-    <Screen ad={null}>
+    <Screen>
       <View className="px-5 pt-2">
         <View className="flex-row justify-end">
           <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t("close")} className="h-10 w-10 items-center justify-center">

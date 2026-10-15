@@ -79,7 +79,7 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pb-8 pt-2">
         <Pressable onPress={leave} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
           <Ionicons name="chevron-back" size={20} color="#C2410C" />

@@ -273,7 +273,7 @@ function SenderHome({
   const current = live[0];
 
   return (
-    <Screen ad="street">
+    <Screen>
       <View className="px-4 pt-3">
         <View className="flex-row items-center">
           <BrandMark />
@@ -397,7 +397,7 @@ function SenderOrders({
   );
 
   return (
-    <Screen ad="street">
+    <Screen>
       <View className="px-4 pt-3">
         <BrandMark />
         {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
@@ -543,7 +543,7 @@ function SenderChat({
   }, [account, load]);
 
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pt-3">
         <View className="flex-row items-center">
           <BrandMark />
@@ -604,7 +604,7 @@ function SenderChat({
 
 function SenderProfile() {
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pt-3">
         <ProfilePanel />
         <AdminEntry />

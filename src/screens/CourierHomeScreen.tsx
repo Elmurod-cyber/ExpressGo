@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AdBanner } from "../components/AdBanner";
 import { MapBoard } from "../components/MapBoard";
 import { Screen } from "../components/Screen";
 import { StatusPill } from "../components/StatusPill";
@@ -576,7 +575,6 @@ export function CourierHomeScreen({
     <Screen
       scrollRef={scrollRef}
       scroll={page !== "home" && !(page === "orders" && sheetOpen)}
-      ad={page === "home" || page === "wallet" || page === "profile" || (page === "orders" && sheetOpen) ? null : "market"}
       compact={page === "wallet" || page === "profile"}
     >
       <View className={page === "orders" && sheetOpen ? "flex-1 px-4 pt-1" : page === "home" ? "flex-1 px-4 pt-3" : "px-4 pt-3"}>
@@ -864,9 +862,6 @@ export function CourierHomeScreen({
                 }}
               />
             ) : null}
-            <View className="pb-6 pt-8">
-              <AdBanner id="market" />
-            </View>
             </ScrollView>
 
             <Modal visible={mapOpen} animationType="slide" onRequestClose={() => setMapOpen(false)}>

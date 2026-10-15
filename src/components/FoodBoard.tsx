@@ -19,7 +19,7 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
   if (place) return <PlaceMenu place={place} onBack={() => setPlaceId(null)} />;
 
   return (
-    <Screen ad={null} compact>
+    <Screen compact>
       <View className="px-4 pt-2">
         <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
           <Ionicons name="chevron-back" size={18} color="#155EEF" />
@@ -183,7 +183,6 @@ function PlaceMenu({ place, onBack }: { place: FoodPlace; onBack: () => void }) 
 
   return (
     <Screen
-      ad={null}
       compact
       footer={
         <View className="bg-canvas px-4 pb-4">
