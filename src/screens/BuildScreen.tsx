@@ -9,10 +9,10 @@ import { PhoneCodeBox } from "../components/PhoneCodeBox";
 import { api } from "../services/api";
 import { readBuildProfiles, saveBuildProfile, type BuildProfile, type BuildWho } from "../services/buildProfile";
 import { formatMoney } from "../services/money";
-import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import type { BuilderCard, BuilderKind, BuilderPay, BuilderTerm, MasterPass } from "../types";
+import { formatUzPhone } from "../services/phoneMask";
+import type { BuilderCard, BuilderKind, BuilderPay, BuilderTerm } from "../types";
 
-type Side = "entry" | "seek" | "hire";
+type Side = "entry" | "hire";
 type Pane = "signup" | "list" | "form" | "mine";
 
 const TRADES = ["builder", "brick", "plaster", "tile", "plumb", "electric", "weld", "paint", "roof", "universal"] as const;
@@ -24,10 +24,6 @@ function tradeLabel(t: (key: string) => string, trade: string): string {
   return label === key ? trade : label;
 }
 
-function whoOf(side: Side): BuildWho {
-  return side === "hire" ? "employer" : "master";
-}
-
 export function BuildScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
   const [side, setSide] = useState<Side>("entry");
@@ -36,9 +32,9 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
   const [kind, setKind] = useState<BuilderKind>("job");
   const [draft, setDraft] = useState<BuilderCard | null>(null);
   const [fromMine, setFromMine] = useState(false);
-  const who = whoOf(side);
+  const who: BuildWho = "employer";
   const profile = profiles[who] ?? null;
-  const ownKind: BuilderKind = side === "hire" ? "job" : "offer";
+  const ownKind: BuilderKind = "job";
 
   useEffect(() => {
     void readBuildProfiles().then(setProfiles);
@@ -64,11 +60,10 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
     onBack();
   }
 
-  function enter(next: Exclude<Side, "entry">) {
-    const saved = profiles[whoOf(next)];
-    const ready = Boolean(saved && (next === "seek" || saved.token));
-    setSide(next);
-    setPane(ready ? "list" : "signup");
+  function enter() {
+    const saved = profiles.employer;
+    setSide("hire");
+    setPane(saved?.token ? "list" : "signup");
   }
 
   function openForm(nextKind: BuilderKind, nextDraft: BuilderCard | null, mine: boolean) {
@@ -86,26 +81,16 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
           <Text className="ml-1 text-sm font-semibold text-[#C2410C]">{t("build.back")}</Text>
         </Pressable>
 
-        {side === "entry" ? <BuildEntry onSeek={() => enter("seek")} onHire={() => enter("hire")} /> : null}
+        {side === "entry" ? <BuildEntry onHire={() => enter()} /> : null}
 
         {side !== "entry" && pane === "signup" ? (
           <BuildSignUp
-            title={side === "hire" ? t("build.hire") : t("build.seek")}
-            sms={side === "hire"}
+            title={t("build.hire")}
             onSave={async (next) => {
               await saveBuildProfile(who, next);
               setProfiles((prev) => ({ ...prev, [who]: next }));
               setPane("list");
             }}
-          />
-        ) : null}
-
-        {side === "seek" && pane === "list" && profile ? (
-          <MasterBoard
-            profile={profile}
-            actionLabel={t("build.offer_btn")}
-            onPost={() => openForm(ownKind, null, false)}
-            onMine={() => setPane("mine")}
           />
         ) : null}
 
@@ -142,7 +127,7 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function BuildEntry({ onSeek, onHire }: { onSeek: () => void; onHire: () => void }) {
+function BuildEntry({ onHire }: { onHire: () => void }) {
   const t = useT();
   return (
     <View>
@@ -153,11 +138,7 @@ function BuildEntry({ onSeek, onHire }: { onSeek: () => void; onHire: () => void
           <Text className="mt-2 text-base leading-6 text-white">{t("build.entry_body")}</Text>
         </View>
       </View>
-      <Pressable onPress={onSeek} accessibilityRole="button" className="mt-5 flex-row items-center justify-center rounded-full bg-[#C2410C] py-4 active:opacity-90">
-        <Ionicons name="hammer" size={20} color="#FFFFFF" />
-        <Text className="ml-2 text-base font-bold text-white">{t("build.seek")}</Text>
-      </Pressable>
-      <Pressable onPress={onHire} accessibilityRole="button" className="mt-3 flex-row items-center justify-center rounded-full bg-[#121212] py-4 active:opacity-90">
+      <Pressable onPress={onHire} accessibilityRole="button" className="mt-5 flex-row items-center justify-center rounded-full bg-[#121212] py-4 active:opacity-90">
         <Ionicons name="business" size={20} color="#FFFFFF" />
         <Text className="ml-2 text-base font-bold text-white">{t("build.hire")}</Text>
       </Pressable>
@@ -170,24 +151,12 @@ function PublicAds() {
   const t = useT();
   const area = useArea();
   const [rows, setRows] = useState<BuilderCard[]>([]);
-  const [pass, setPass] = useState<MasterPass | null>(null);
-  const [masterPhone, setMasterPhone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const saved = await readBuildProfiles();
-      const master = saved.master;
-      const phone = master && master.name.trim().length >= 2 && master.phone.replace(/\D/g, "").length >= 9 ? master.phone : null;
-      if (phone && master) {
-        setPass(await api.registerMaster(master.name, phone));
-        setMasterPhone(phone);
-      } else {
-        setPass(null);
-        setMasterPhone(null);
-      }
-      setRows(await api.listBuilders(null, phone));
+      setRows(await api.listBuilders(null));
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("fail.generic"));
@@ -196,17 +165,6 @@ function PublicAds() {
     }
   }, [t]);
 
-  async function buy() {
-    if (!masterPhone) return;
-    try {
-      setPass(await api.startMasterSub(masterPhone));
-      setRows(await api.listBuilders(null, masterPhone));
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }
-
   useEffect(() => {
     void load();
     const timer = setInterval(() => void load(), 4000);
@@ -214,23 +172,9 @@ function PublicAds() {
   }, [load]);
 
   const shown = rows.filter((card) => matchesArea(area.place, card.region, card.area));
-  const until = pass?.active && pass.until ? dayStamp(pass.until) : "";
 
   return (
     <View className="mt-5">
-      {pass ? (
-        <View className="mb-3 rounded-2xl bg-white px-4 py-3">
-          <Text className="text-sm leading-5 text-muted">{t("build.sub_free")}</Text>
-          <Text className={`mt-1 text-sm ${pass.active ? "font-semibold text-[#C2410C]" : "text-muted"}`}>
-            {pass.active ? t("build.sub_on", { date: until }) : t("build.sub_off")}
-          </Text>
-          {pass.active ? null : (
-            <Pressable onPress={() => void buy()} accessibilityRole="button" className="mt-3 items-center rounded-2xl bg-[#C2410C] py-3">
-              <Text className="text-sm font-bold text-white">{t("build.sub_buy", { money: formatMoney(pass.price) })}</Text>
-            </Pressable>
-          )}
-        </View>
-      ) : null}
       {!area.place ? (
         <Pressable onPress={area.openPicker} accessibilityRole="button" className="rounded-2xl bg-white px-4 py-3">
           <Text className="text-sm font-semibold text-ink">{t("area.pick")}</Text>
@@ -255,151 +199,22 @@ function PublicAds() {
 
 function BuildSignUp({
   title,
-  sms = false,
   onSave,
 }: {
   title: string;
-  sms?: boolean;
   onSave: (profile: BuildProfile) => Promise<void>;
 }) {
   const t = useT();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(formatUzPhone(""));
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  if (sms) {
-    return (
-      <PhoneCodeBox
-        kind="employer"
-        title={title}
-        hint={t("build.sms_hint")}
-        tone="orange"
-        onVerified={async (pass) => {
-          await onSave({ name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token });
-        }}
-      />
-    );
-  }
-
-  async function submit() {
-    if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 12) {
-      setError(t("build.register_hint"));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await api.registerMaster(name.trim(), phone);
-      await onSave({ name: name.trim(), phone });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-      setBusy(false);
-    }
-  }
-
   return (
-    <View>
-      <Text className="text-2xl font-bold text-ink">{title}</Text>
-      <Text className="mt-2 text-sm leading-5 text-muted">{t("build.register_hint")}</Text>
-      <Field label={t("auth.name")} value={name} onChange={setName} placeholder={t("auth.name_ph")} />
-      <Field label={t("auth.phone")} value={phone} onChange={(value) => setPhone((prev) => editUzPhone(value, prev))} placeholder="+998" keyboard="phone-pad" />
-      {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
-      <Pressable onPress={() => void submit()} disabled={busy} accessibilityRole="button" className={`mt-4 items-center rounded-full py-4 ${busy ? "bg-slate-200" : "bg-[#C2410C] active:opacity-90"}`}>
-        <Text className={`text-base font-bold ${busy ? "text-slate-500" : "text-white"}`}>{t("build.register")}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function dayStamp(at: number): string {
-  const date = new Date(at);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
-}
-
-function MasterBoard({
-  profile,
-  actionLabel,
-  onPost,
-  onMine,
-}: {
-  profile: BuildProfile;
-  actionLabel: string;
-  onPost: () => void;
-  onMine: () => void;
-}) {
-  const t = useT();
-  const area = useArea();
-  const [rows, setRows] = useState<BuilderCard[]>([]);
-  const [pass, setPass] = useState<MasterPass | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    try {
-      setPass(await api.registerMaster(profile.name, profile.phone));
-      setRows(await api.listBuilders("job", profile.phone));
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    } finally {
-      setLoading(false);
-    }
-  }, [profile.name, profile.phone, t]);
-
-  useEffect(() => {
-    void load();
-    const timer = setInterval(() => void load(), 4000);
-    return () => clearInterval(timer);
-  }, [load]);
-
-  async function buy() {
-    try {
-      setPass(await api.startMasterSub(profile.phone));
-      setRows(await api.listBuilders("job", profile.phone));
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }
-
-  const shown = rows.filter((card) => matchesArea(area.place, card.region, card.area));
-  const until = pass?.active && pass.until ? dayStamp(pass.until) : "";
-
-  return (
-    <View>
-      <Text className="text-2xl font-bold text-ink">{t("build.seek")}</Text>
-      <Text className="mt-2 text-sm leading-5 text-muted">{t("build.sub_free")}</Text>
-      {pass ? (
-        <Text className={`mt-2 text-sm ${pass.active ? "font-semibold text-[#C2410C]" : "text-muted"}`}>
-          {pass.active ? t("build.sub_on", { date: until }) : t("build.sub_off")}
-        </Text>
-      ) : null}
-      {pass && !pass.active ? (
-        <Pressable onPress={() => void buy()} accessibilityRole="button" className="mt-3 items-center rounded-2xl bg-[#C2410C] py-3">
-          <Text className="text-sm font-bold text-white">{t("build.sub_buy", { money: formatMoney(pass.price) })}</Text>
-        </Pressable>
-      ) : null}
-      <Pressable onPress={onPost} accessibilityRole="button" className="mt-4 flex-row items-center justify-center rounded-full bg-[#C2410C] py-4 active:opacity-90">
-        <Ionicons name="add" size={18} color="#FFFFFF" />
-        <Text className="ml-2 text-base font-bold text-white">{actionLabel}</Text>
-      </Pressable>
-      <Pressable onPress={onMine} accessibilityRole="button" className="mt-3 items-center rounded-full bg-[#121212] py-4 active:opacity-90">
-        <Text className="text-base font-bold text-white">{t("build.mine")}</Text>
-      </Pressable>
-      {error ? <Text className="mt-3 text-sm text-red-600">{error}</Text> : null}
-      {loading && shown.length === 0 ? (
-        <View className="mt-6 items-center">
-          <ActivityIndicator color="#C2410C" />
-        </View>
-      ) : shown.length === 0 ? (
-        <View className="mt-3 rounded-3xl bg-white px-5 py-6">
-          <Text className="text-base font-semibold text-ink">{t("city.all_empty")}</Text>
-        </View>
-      ) : (
-        shown.map((card) => <AdCard key={card.id} card={card} />)
-      )}
-    </View>
+    <PhoneCodeBox
+      kind="employer"
+      title={title}
+      hint={t("build.sms_hint")}
+      tone="orange"
+      onVerified={async (pass) => {
+        await onSave({ name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token });
+      }}
+    />
   );
 }
 

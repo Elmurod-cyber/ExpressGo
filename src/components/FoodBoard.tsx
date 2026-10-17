@@ -7,10 +7,9 @@ import { api } from "../services/api";
 import { clearFoodProfile, readFoodProfile, saveFoodProfile, type FoodProfile } from "../services/foodProfile";
 import { FOOD_PLACES, type FoodDish, type FoodPlace } from "../data/foodPlaces";
 import { formatMoney } from "../services/money";
-import { editUzPhone, formatUzPhone } from "../services/phoneMask";
+import { formatUzPhone } from "../services/phoneMask";
 import { useT } from "../context/Session";
 import type { FoodTicket, KitchenDesk } from "../types";
-import { RestaurantDesk } from "./RestaurantDesk";
 
 export function FoodScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
@@ -125,11 +124,6 @@ function PlaceMenu({
   const [sent, setSent] = useState(false);
   const [accepting, setAccepting] = useState(true);
   const [tracked, setTracked] = useState<FoodTicket | null>(null);
-  const [gate, setGate] = useState(false);
-  const [gateName, setGateName] = useState("");
-  const [gatePhone, setGatePhone] = useState(formatUzPhone(""));
-  const [gateError, setGateError] = useState<string | null>(null);
-  const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
   const [mine, setMine] = useState(false);
   const digits = place.phone.replace(/\D/g, "");
   const lines = place.dishes
@@ -240,25 +234,6 @@ function PlaceMenu({
     }
   }
 
-  async function enterDesk() {
-    setGateError(null);
-    if (gateName.trim().length < 2 || gatePhone.replace(/\D/g, "").length < 12) {
-      setGateError(t("food.demo_hint"));
-      return;
-    }
-    try {
-      const owner = await api.registerFoodOwner(place.id, gateName.trim(), gatePhone);
-      setOwnerPhone(formatUzPhone(owner.phone));
-      setGate(false);
-    } catch (caught) {
-      setGateError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }
-
-  if (ownerPhone) {
-    return <RestaurantDesk place={place} demoPhone={ownerPhone} onBack={() => setOwnerPhone(null)} />;
-  }
-
   return (
     <Screen
       compact
@@ -307,46 +282,6 @@ function PlaceMenu({
               <Ionicons name="call" size={14} color="#C2410C" />
               <Text className="ml-1.5 text-sm font-bold text-[#C2410C]">{place.phone}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => {
-                setGate((value) => !value);
-                setGateError(null);
-              }}
-              accessibilityRole="button"
-              className="mt-3 flex-row items-center justify-center rounded-full bg-[#121212] py-3 active:opacity-90"
-            >
-              <Ionicons name="lock-closed" size={16} color="#FFFFFF" />
-              <Text className="ml-2 text-sm font-bold text-white">{t("food.manage")}</Text>
-            </Pressable>
-            {gate ? (
-              <View className="mt-3 rounded-3xl bg-[#121212] px-4 py-4">
-                <Text className="text-base font-bold text-white">{t("food.demo_title")}</Text>
-                <Text className="mt-1 text-sm leading-5 text-white/70">{t("food.demo_hint")}</Text>
-                <TextInput
-                  value={gateName}
-                  onChangeText={setGateName}
-                  placeholder={t("auth.name")}
-                  placeholderTextColor="#98A2B3"
-                  className="mt-3 rounded-2xl bg-white px-3 py-2.5 text-base text-ink"
-                />
-                <TextInput
-                  value={gatePhone}
-                  onChangeText={(value) => setGatePhone((prev) => editUzPhone(value, prev))}
-                  placeholder="+998"
-                  placeholderTextColor="#98A2B3"
-                  keyboardType="phone-pad"
-                  className="mt-3 rounded-2xl bg-white px-3 py-2.5 text-base text-ink"
-                />
-                {gateError ? <Text className="mt-2 text-sm text-red-300">{gateError}</Text> : null}
-                <Pressable
-                  onPress={() => void enterDesk()}
-                  accessibilityRole="button"
-                  className="mt-3 items-center rounded-full bg-[#C2410C] py-3 active:opacity-90"
-                >
-                  <Text className="text-sm font-bold text-white">{t("food.demo_enter")}</Text>
-                </Pressable>
-              </View>
-            ) : null}
           </View>
         </View>
 

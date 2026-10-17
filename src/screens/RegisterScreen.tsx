@@ -6,8 +6,7 @@ import { BrandMark } from "../components/BrandMark";
 import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import { COURIER_VEHICLES, VEHICLE_LABEL } from "../server/rules";
-import type { OtpChallenge, Role, VehicleKind } from "../types";
+import type { OtpChallenge, Role } from "../types";
 
 type AuthMode = "signup" | "login";
 
@@ -22,12 +21,10 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
   const [mode, setMode] = useState<AuthMode>("signup");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState(formatUzPhone(""));
-  const [vehicle, setVehicle] = useState<VehicleKind>("moto");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [code, setCode] = useState("");
-  const courier = role === "courier";
   const signup = mode === "signup";
 
   function switchMode(next: AuthMode) {
@@ -44,7 +41,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
           role,
           name,
           phone,
-          vehicle: courier ? vehicle : undefined,
+          vehicle: undefined,
         });
         setChallenge(await api.requestOtp({ role, phone: account.phone }));
       } else {
@@ -162,7 +159,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
             {signup ? t("auth.signup_title") : t("auth.login_title")}
           </Text>
           <Text className="mt-2 text-center text-sm text-muted">
-            {signup ? (courier ? t("auth.signup_courier") : t("auth.signup_sender")) : t("auth.login_sub")}
+            {signup ? t("auth.signup_sender") : t("auth.login_sub")}
           </Text>
         </View>
 
@@ -184,31 +181,6 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
             placeholder="+998"
             keyboardType="phone-pad"
           />
-
-          {signup && courier ? (
-            <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-ink">{t("auth.vehicle")}</Text>
-              <View className="flex-row flex-wrap gap-2">
-                {COURIER_VEHICLES.map((kind) => {
-                  const selected = vehicle === kind;
-                  return (
-                    <Pressable
-                      key={kind}
-                      onPress={() => setVehicle(kind)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      className={`items-center rounded-2xl px-3 py-3 ${selected ? "bg-ink" : "bg-canvas"}`}
-                    >
-                      <Text className={`text-center text-sm font-semibold ${selected ? "text-white" : "text-ink"}`}>
-                        {VEHICLE_LABEL[kind]}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text className="mt-2 text-xs text-muted">{t("auth.docs_drive")}</Text>
-            </View>
-          ) : null}
 
           {error ? <Text className="mb-4 text-sm text-red-600">{error}</Text> : null}
 

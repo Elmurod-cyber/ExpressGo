@@ -9,7 +9,6 @@ import { preparePush } from "../services/push";
 import { getApiUrl, setApiUrl as writeApiUrl } from "../services/endpoint";
 import { BrandLogo } from "../components/BrandMark";
 import { getSessionToken, setSessionToken } from "../services/sessionToken";
-import { stopBackgroundGps } from "../services/backgroundGps";
 
 type SessionValue = {
   account: Account | null;
@@ -89,7 +88,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAccount(null);
     setDockState("sender");
     setSessionToken("");
-    void stopBackgroundGps();
     persistNow({ accountId: null, account: null, dock: "sender", locale: getLocale(), pushOn, token: null });
   }, [persistNow, pushOn]);
 

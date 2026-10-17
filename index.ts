@@ -1,6 +1,5 @@
 import { registerRootComponent } from 'expo';
 
-import './src/services/backgroundGps';
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

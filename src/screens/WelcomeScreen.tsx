@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { Screen } from "../components/Screen";
@@ -11,19 +11,16 @@ import { useArea } from "../context/Area";
 import { matchesArea } from "../server/places";
 import { api } from "../services/api";
 import { formatMoney } from "../services/money";
-import { saveTripProfile } from "../services/tripProfile";
-import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import { VEHICLE_LABEL } from "../server/rules";
 import type { BuilderCard, LiveJob, TripCard } from "../types";
 import { RegisterScreen } from "./RegisterScreen";
 import { SenderApp } from "./SenderHomeScreen";
-import { CourierHomeScreen } from "./CourierHomeScreen";
 import { IntercityScreen, TripEntry } from "./IntercityScreen";
 import { FoodScreen } from "../components/FoodBoard";
 import { BuildScreen } from "./BuildScreen";
 import { DeliveryEntry } from "./DeliveryEntry";
 
-type Gate = "sender" | "rider" | "driver" | "courier";
+type Gate = "sender" | "rider";
 type Feed = "all" | "jobs" | "food" | "trips" | "barber" | "builder";
 
 export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => void }) {
@@ -37,10 +34,6 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
   const [trips, setTrips] = useState<TripCard[]>([]);
   const [builders, setBuilders] = useState<BuilderCard[]>([]);
   const [boardWidth, setBoardWidth] = useState(0);
-  const [opened, setOpened] = useState<Record<string, { phone: string; address: string }>>({});
-  const [askId, setAskId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(formatUzPhone(""));
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [detail, setDetail] = useState<{ kind: "job" | "trip"; id: string } | null>(null);
@@ -70,46 +63,6 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
     return () => clearInterval(timer);
   }, [load]);
 
-  async function reveal(tripId: string, driverPhone: string) {
-    const revealed = await api.revealTripPhone(tripId, driverPhone);
-    if (revealed.ok) {
-      setOpened((prev) => ({ ...prev, [tripId]: { phone: revealed.phone, address: revealed.address } }));
-      setAskId(null);
-      setError(null);
-      return;
-    }
-    Alert.alert(t("trip.pass_title"), t("trip.pass_body", { days: revealed.days, money: formatMoney(revealed.price) }), [
-      { text: t("no"), style: "cancel" },
-      {
-        text: t("trip.pass_buy"),
-        onPress: () => {
-          void api.registerTripAccount("driver", name, driverPhone).then(async (account) => {
-            await saveTripProfile("driver", { id: account.id, name: account.name, phone: formatUzPhone(account.phone) });
-            await api.startTripPass(account.id);
-            await reveal(tripId, account.id);
-          }).catch((caught: unknown) => {
-            setError(caught instanceof Error ? caught.message : t("fail.generic"));
-          });
-        },
-      },
-    ]);
-  }
-
-  function submitDriver() {
-    if (!askId) return;
-    const digits = phone.replace(/\D/g, "");
-    if (name.trim().length < 2 || digits.length < 9) {
-      setError(t("city.driver_hint"));
-      return;
-    }
-    void api.registerTripAccount("driver", name.trim(), phone).then(async (account) => {
-      await saveTripProfile("driver", { id: account.id, name: account.name, phone: formatUzPhone(account.phone) });
-      await reveal(askId, account.id);
-    }).catch((caught: unknown) => {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    });
-  }
-
   function pickFeed(next: Exclude<Feed, "all">) {
     setDetail(null);
     if (feed === next) {
@@ -121,7 +74,6 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
   }
 
   function openDetail(next: { kind: "job" | "trip"; id: string }) {
-    setAskId(null);
     setError(null);
     setDetail(next);
   }
@@ -146,8 +98,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
     if (!alive) setDetail(null);
   }, [detail, jobs, trips]);
 
-  const nestedApp =
-    (gate === "sender" && account?.role === "sender") || (gate === "courier" && account?.role === "courier");
+  const nestedApp = gate === "sender" && account?.role === "sender";
   const pickingService =
     gate !== null || feed === "food" || feed === "builder" || feed === "jobs" || (feed === "trips" && tripDoor === "gate");
 
@@ -159,24 +110,11 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
     if (account?.role === "sender") return <SenderApp onBack={() => setGate(null)} />;
     return <RegisterScreen role="sender" onBack={() => setGate(null)} />;
   }
-  if (gate === "courier") {
-    if (account?.role === "courier") return <CourierHomeScreen onBack={() => setGate(null)} />;
-    return <RegisterScreen role="courier" onBack={() => setGate(null)} />;
-  }
   if (gate === "rider") {
     return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />;
   }
-  if (gate === "driver") {
-    return <IntercityScreen start="driver" onBack={() => setGate(null)} />;
-  }
   if (feed === "trips" && tripDoor === "gate") {
-    return (
-      <TripEntry
-        onBack={() => setFeed("all")}
-        onRider={() => setGate("rider")}
-        onDriver={() => setGate("driver")}
-      />
-    );
+    return <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />;
   }
   if (feed === "food") {
     return <FoodScreen onBack={() => setFeed("all")} />;
@@ -193,10 +131,9 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
           setFeed("all");
         }}
         onOrder={() => setGate("sender")}
-        onCourier={() => setGate("courier")}
         onOpenJob={(id) => openDetail({ kind: "job", id })}
       >
-        {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} onTake={() => setGate("courier")} /> : null}
+        {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} /> : null}
       </DeliveryEntry>
     );
   }
@@ -258,27 +195,9 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
         </View>
 
         {pickedJob ? (
-          <JobSheet job={pickedJob} onClose={() => setDetail(null)} onTake={() => setGate("courier")} />
+          <JobSheet job={pickedJob} onClose={() => setDetail(null)} />
         ) : pickedTrip ? (
-          <TripSheet
-            trip={pickedTrip}
-            phoneShown={opened[pickedTrip.id]?.phone ?? null}
-            addressShown={opened[pickedTrip.id]?.address ?? null}
-            asking={askId === pickedTrip.id}
-            name={name}
-            phone={phone}
-            onName={setName}
-            onPhone={(value) => setPhone((prev) => editUzPhone(value, prev))}
-            onClose={() => {
-              setAskId(null);
-              setDetail(null);
-            }}
-            onTake={() => {
-              setError(null);
-              setAskId(pickedTrip.id);
-            }}
-            onSubmit={submitDriver}
-          />
+          <TripSheet trip={pickedTrip} onClose={() => setDetail(null)} />
         ) : feed === "all" ? (
           <>
             <View className="mt-5 flex-row items-center justify-between">
@@ -382,7 +301,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
                     {t("trip.seats")}: {trip.seats}
                   </Text>
                   <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{trip.price > 0 ? formatMoney(trip.price) : t("trip.deal")}</Text>
-                  <Text className="mt-2 text-base font-semibold text-brand">{opened[trip.id]?.phone ?? trip.phoneMasked}</Text>
+                  <Text className="mt-2 text-base font-semibold text-brand">{trip.phoneMasked}</Text>
                 </Pressable>
               ))
             )}
@@ -395,7 +314,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
   );
 }
 
-function JobSheet({ job, onClose, onTake }: { job: LiveJob; onClose: () => void; onTake: () => void }) {
+function JobSheet({ job, onClose }: { job: LiveJob; onClose: () => void }) {
   const t = useT();
   return (
     <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
@@ -411,41 +330,12 @@ function JobSheet({ job, onClose, onTake }: { job: LiveJob; onClose: () => void;
       <DetailLine label={t("sheet.pickup")} value={job.pickup} />
       <DetailLine label={t("sheet.drop")} value={job.dropoff} />
       <DetailLine label={t("auth.vehicle")} value={VEHICLE_LABEL[job.vehicle]} />
-      {job.status === "posted" ? (
-        <Pressable onPress={onTake} accessibilityRole="button" className="mt-4 items-center rounded-full bg-[#012668] py-3.5 active:opacity-90">
-          <Text className="text-base font-bold text-white">{t("city.take")}</Text>
-        </Pressable>
-      ) : null}
       <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{formatMoney(job.deliveryFee)}</Text>
     </View>
   );
 }
 
-function TripSheet({
-  trip,
-  phoneShown,
-  addressShown,
-  asking,
-  name,
-  phone,
-  onName,
-  onPhone,
-  onClose,
-  onTake,
-  onSubmit,
-}: {
-  trip: TripCard;
-  phoneShown: string | null;
-  addressShown: string | null;
-  asking: boolean;
-  name: string;
-  phone: string;
-  onName: (value: string) => void;
-  onPhone: (value: string) => void;
-  onClose: () => void;
-  onTake: () => void;
-  onSubmit: () => void;
-}) {
+function TripSheet({ trip, onClose }: { trip: TripCard; onClose: () => void }) {
   const t = useT();
   return (
     <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
@@ -464,37 +354,7 @@ function TripSheet({
       <Text className="mt-3 text-lg font-bold text-[#FF8A00]">
         {t("trip.seats")}: {trip.seats}
       </Text>
-      {addressShown ? <Text className="mt-2 text-sm text-muted">{addressShown}</Text> : null}
-      {phoneShown ? <Text className="mt-3 text-base font-semibold text-brand">{phoneShown}</Text> : null}
-      {!phoneShown && asking ? (
-        <>
-          <Text className="mt-4 text-base font-semibold text-white">{t("city.driver_title")}</Text>
-          <Text className="mt-1 text-sm text-[#A3A3A3]">{t("city.driver_hint")}</Text>
-          <TextInput
-            value={name}
-            onChangeText={onName}
-            placeholder={t("auth.name_ph")}
-            placeholderTextColor="#98A2B3"
-            className="mt-3 rounded-2xl border border-line bg-canvas px-4 py-3 text-base text-ink"
-          />
-          <TextInput
-            value={phone}
-            onChangeText={onPhone}
-            placeholder="+998"
-            placeholderTextColor="#98A2B3"
-            keyboardType="phone-pad"
-            className="mt-2 rounded-2xl border border-line bg-canvas px-4 py-3 text-base text-ink"
-          />
-          <Pressable onPress={onSubmit} accessibilityRole="button" className="mt-3 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90">
-            <Text className="text-base font-bold text-white">{t("otp.ok")}</Text>
-          </Pressable>
-        </>
-      ) : null}
-      {!phoneShown && !asking ? (
-        <Pressable onPress={onTake} accessibilityRole="button" className="mt-4 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90">
-          <Text className="text-base font-bold text-white">{t("city.take")}</Text>
-        </Pressable>
-      ) : null}
+      <Text className="mt-3 text-base font-semibold text-brand">{trip.phoneMasked}</Text>
       {trip.note ? <Text className="mt-2 text-sm text-[#A3A3A3]">{trip.note}</Text> : null}
       <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{trip.price > 0 ? formatMoney(trip.price) : t("trip.deal")}</Text>
     </View>

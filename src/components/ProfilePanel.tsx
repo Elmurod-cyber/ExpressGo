@@ -1,15 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Image, Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession, useT } from "../context/Session";
 import { LANGUAGE_SWITCH_ENABLED } from "../i18n";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { api } from "../services/api";
-import { formatMoney } from "../services/money";
-import { takeProofPhoto } from "../services/photo";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
-import { DOC_LABEL, VEHICLE_LABEL } from "../server/rules";
-import type { CourierDocKind, CourierDocs, DocStatus } from "../types";
 
 export function ProfilePanel({ onClose }: { onClose?: () => void }) {
   const { account, replaceAccount, signOut, pushOn, setPushOn } = useSession();
@@ -19,24 +15,6 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [docsOpen, setDocsOpen] = useState(false);
-
-  async function uploadDoc(kind: CourierDocKind) {
-    if (!account) return;
-    setBusy(true);
-    setError(null);
-    setSaved(false);
-    try {
-      const uri = await takeProofPhoto();
-      if (!uri) return;
-      replaceAccount(await api.submitCourierDoc(account.id, kind, uri));
-      setSaved(true);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("saved_fail"));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function save() {
     if (!account) return;
@@ -60,9 +38,7 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
       <View className="flex-row items-center">
         <View className="flex-1 pr-3">
           <Text className="text-base font-bold text-ink">{t("profile")}</Text>
-          <Text className="text-xs text-muted">
-            {account.role === "courier" ? t("profile.courier") : t("profile.sender")}
-          </Text>
+          <Text className="text-xs text-muted">{t("profile.sender")}</Text>
         </View>
         {LANGUAGE_SWITCH_ENABLED ? <LanguageSwitch flush /> : null}
         {onClose ? (
@@ -114,17 +90,6 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
         />
       </Field>
 
-      {account.role === "courier" && account.docs ? (
-        <CourierDocsBlock
-          docs={account.docs}
-          open={docsOpen}
-          onToggle={() => setDocsOpen((value) => !value)}
-          busy={busy}
-          onUpload={(kind) => void uploadDoc(kind)}
-          meta={`${t("admin.dep", { money: formatMoney(account.balance ?? 0) })}${account.vehicle ? ` · ${VEHICLE_LABEL[account.vehicle]}` : ""}${account.shiftOn ? ` · ${t("profile.shift_on")}` : ` · ${t("profile.shift_off")}`}`}
-        />
-      ) : null}
-
       {error ? <Text className="mt-2 text-xs text-red-600">{error}</Text> : null}
       {saved && !error ? <Text className="mt-2 text-xs font-semibold text-brand">{t("saved_ok")}</Text> : null}
 
@@ -146,67 +111,6 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function CourierDocsBlock({
-  docs,
-  open,
-  onToggle,
-  busy,
-  onUpload,
-  meta,
-}: {
-  docs: CourierDocs;
-  open: boolean;
-  onToggle: () => void;
-  busy: boolean;
-  onUpload: (kind: CourierDocKind) => void;
-  meta: string;
-}) {
-  const t = useT();
-  const approved = docs.needed.filter((kind) => docs.status[kind] === "approved");
-  const waiting = docs.needed.filter((kind) => docs.status[kind] !== "approved");
-  return (
-    <View className="mt-3">
-      <Pressable
-        onPress={approved.length > 0 ? onToggle : undefined}
-        accessibilityRole={approved.length > 0 ? "button" : undefined}
-        className="flex-row items-center"
-      >
-        <Text className="flex-1 text-xs font-medium text-muted">
-          {t("duty.docs", { a: docs.readyCount, b: docs.needCount })}
-        </Text>
-        {approved.length > 0 ? (
-          <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color="#98A2B3" />
-        ) : null}
-      </Pressable>
-      {waiting.map((kind) => (
-        <DocRow
-          key={kind}
-          kind={kind}
-          uri={docs[kind]}
-          status={docs.status[kind]}
-          note={docs.notes[kind]}
-          disabled={busy}
-          onPress={() => onUpload(kind)}
-        />
-      ))}
-      {open
-        ? approved.map((kind) => (
-            <DocRow
-              key={kind}
-              kind={kind}
-              uri={docs[kind]}
-              status={docs.status[kind]}
-              note={docs.notes[kind]}
-              disabled={busy}
-              onPress={() => onUpload(kind)}
-            />
-          ))
-        : null}
-      <Text className="mt-2 text-xs text-muted">{meta}</Text>
-    </View>
-  );
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="mt-3">
@@ -216,60 +120,3 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function DocRow({
-  kind,
-  uri,
-  status,
-  note,
-  disabled,
-  onPress,
-}: {
-  kind: CourierDocKind;
-  uri: string | null;
-  status: DocStatus;
-  note: string | null;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const t = useT();
-  const hint =
-    status === "approved"
-      ? t("doc.approved")
-      : status === "pending"
-        ? t("duty.reviewing")
-        : status === "rejected"
-          ? t("duty.rejected", { why: note ? ` · ${note}` : "" })
-          : t("duty.take_photo");
-  const icon =
-    status === "approved"
-      ? "checkmark-circle"
-      : status === "pending"
-        ? "time-outline"
-        : status === "rejected"
-          ? "close-circle"
-          : "chevron-forward";
-  const color =
-    status === "approved" ? "#12B76A" : status === "pending" ? "#C47E09" : status === "rejected" ? "#D92D20" : "#98A2B3";
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={DOC_LABEL[kind]}
-      className="mt-1.5 flex-row items-center rounded-xl bg-canvas px-2.5 py-2"
-    >
-      {uri ? (
-        <Image source={{ uri }} style={{ width: 36, height: 36, borderRadius: 10 }} />
-      ) : (
-        <View className="h-9 w-9 items-center justify-center rounded-lg bg-white">
-          <Ionicons name="camera-outline" size={16} color="#667085" />
-        </View>
-      )}
-      <View className="ml-2.5 flex-1">
-        <Text className="text-sm font-semibold text-ink">{DOC_LABEL[kind]}</Text>
-        <Text className={`text-xs ${status === "rejected" ? "text-red-600" : "text-muted"}`}>{hint}</Text>
-      </View>
-      <Ionicons name={icon} size={18} color={color} />
-    </Pressable>
-  );
-}

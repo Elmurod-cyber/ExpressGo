@@ -11,14 +11,12 @@ import type { LiveJob } from "../types";
 export function DeliveryEntry({
   onBack,
   onOrder,
-  onCourier,
   jobs,
   onOpenJob,
   children,
 }: {
   onBack: () => void;
   onOrder: () => void;
-  onCourier: () => void;
   jobs: LiveJob[];
   onOpenJob: (id: string) => void;
   children?: ReactNode;
@@ -50,14 +48,6 @@ export function DeliveryEntry({
         >
           <Ionicons name="cube-outline" size={20} color="#FFFFFF" />
           <Text className="ml-2 text-base font-bold text-white">{t("sender.new_btn")}</Text>
-        </Pressable>
-        <Pressable
-          onPress={onCourier}
-          accessibilityRole="button"
-          className="mt-3 flex-row items-center justify-center rounded-full bg-[#121212] py-4 active:opacity-90"
-        >
-          <Ionicons name="bicycle" size={20} color="#FFFFFF" />
-          <Text className="ml-2 text-base font-bold text-white">{t("city.courier")}</Text>
         </Pressable>
         {jobs.length === 0 ? (
           <View className="mt-5 rounded-3xl bg-white px-5 py-6">

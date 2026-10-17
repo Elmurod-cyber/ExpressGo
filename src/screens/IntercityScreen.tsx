@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { Screen } from "../components/Screen";
@@ -7,16 +7,14 @@ import { useT } from "../context/Session";
 import { PhoneCodeBox } from "../components/PhoneCodeBox";
 import { api } from "../services/api";
 import { formatMoney } from "../services/money";
-import { editUzPhone, formatUzPhone } from "../services/phoneMask";
+import { formatUzPhone } from "../services/phoneMask";
 import { readTripProfiles, saveTripProfile, type TripProfile, type TripSide } from "../services/tripProfile";
 import type { MapPoint } from "../services/distance";
 import { nearestPlace, placeByName, placeGroups } from "../server/places";
 import { findPlace } from "../services/geo";
-import { pickAvatarPhoto } from "../services/photo";
-import { TRIP_NEAR_KM } from "../server/rules";
-import type { TripCard, TripPass } from "../types";
+import type { TripCard } from "../types";
 
-type Side = "pick" | "rider" | "driver";
+type Side = "pick" | "rider";
 type RiderPane = "home" | "post" | "mine";
 
 export function IntercityScreen({
@@ -40,21 +38,21 @@ export function IntercityScreen({
   useEffect(() => {
     void readTripProfiles().then((saved) => {
       setProfiles(saved);
-      const savedSide = start === "rider" || start === "driver" ? saved[start] : null;
-      const missing = start !== "pick" && (!savedSide || (start === "rider" && !savedSide.token));
-      if (missing) setSigning(start);
+      const savedSide = start === "rider" ? saved.rider : null;
+      const missing = start === "rider" && (!savedSide || !savedSide.token);
+      if (missing) setSigning("rider");
       setLoaded(true);
     });
   }, [start]);
 
-  function choose(next: TripSide) {
-    const saved = profiles[next];
-    if (saved && (next === "driver" || saved.token)) {
+  function choose() {
+    const saved = profiles.rider;
+    if (saved?.token) {
       setSigning(null);
-      setSide(next);
+      setSide("rider");
       return;
     }
-    setSigning(next);
+    setSigning("rider");
   }
 
   function leave() {
@@ -89,16 +87,14 @@ export function IntercityScreen({
 
         {side === "pick" && !signing ? (
           <View className="mt-5">
-            <Choice icon="person" title={t("trip.rider")} body={t("trip.rider_body")} onPress={() => choose("rider")} />
-            <Choice icon="car-sport" title={t("trip.driver")} body={t("trip.driver_body")} onPress={() => choose("driver")} />
+            <Choice icon="person" title={t("trip.rider")} body={t("trip.rider_body")} onPress={() => choose()} />
           </View>
         ) : null}
-        {signing ? (
+        {signing === "rider" ? (
           <TripSignUp
-            role={signing}
             onDone={(profile) => {
-              setProfiles((prev) => ({ ...prev, [signing]: profile }));
-              setSide(signing);
+              setProfiles((prev) => ({ ...prev, rider: profile }));
+              setSide("rider");
               setSigning(null);
             }}
           />
@@ -132,7 +128,6 @@ export function IntercityScreen({
             }}
           />
         ) : null}
-        {loaded && !signing && side === "driver" && profiles.driver ? <DriverBoard account={profiles.driver} /> : null}
       </View>
     </Screen>
   );
@@ -141,11 +136,9 @@ export function IntercityScreen({
 export function TripEntry({
   onBack,
   onRider,
-  onDriver,
 }: {
   onBack: () => void;
   onRider: () => void;
-  onDriver: () => void;
 }) {
   const t = useT();
   return (
@@ -174,14 +167,6 @@ export function TripEntry({
         >
           <Ionicons name="person" size={20} color="#FFFFFF" />
           <Text className="ml-2 text-base font-bold text-white">{t("city.rider")}</Text>
-        </Pressable>
-        <Pressable
-          onPress={onDriver}
-          accessibilityRole="button"
-          className="mt-3 flex-row items-center justify-center rounded-full border border-[#121212] bg-[#121212] py-4 active:opacity-90"
-        >
-          <Ionicons name="car-sport" size={20} color="#FFFFFF" />
-          <Text className="ml-2 text-base font-bold text-white">{t("trip.driver_btn")}</Text>
         </Pressable>
         <LiveTrips />
       </View>
@@ -234,76 +219,30 @@ function pointOfPlace(name: string): MapPoint | null {
   return place ? { lat: place.lat, lng: place.lng } : null;
 }
 
-function TripSignUp({ role, onDone }: { role: TripSide; onDone: (profile: TripProfile) => void }) {
+function TripSignUp({ onDone }: { onDone: (profile: TripProfile) => void }) {
   const t = useT();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(formatUzPhone(""));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  if (role === "rider") {
-    return (
-      <PhoneCodeBox
-        kind="rider"
-        title={t("trip.rider")}
-        hint={t("trip.sms_hint")}
-        onVerified={async (pass) => {
-          const account = await api.registerTripAccount("rider", pass.name, pass.phone, pass.token);
-          const profile = { id: account.id, name: account.name, phone: formatUzPhone(account.phone), token: pass.token };
-          await saveTripProfile("rider", profile);
-          onDone(profile);
-        }}
-      />
-    );
-  }
-
-  async function submit() {
-    const digits = phone.replace(/\D/g, "");
-    if (name.trim().length < 2 || digits.length < 12) {
-      setError(t("trip.register_hint"));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const account = await api.registerTripAccount(role, name.trim(), phone);
-      const profile = { id: account.id, name: account.name, phone: formatUzPhone(account.phone) };
-      await saveTripProfile(role, profile);
-      onDone(profile);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <View className="mt-4">
-      <Text className="text-base font-bold text-ink">{role === "driver" ? t("trip.driver") : t("trip.rider")}</Text>
-      <Text className="mt-1 text-sm text-muted">{t("trip.register_hint")}</Text>
-      <Field label={t("auth.name")} value={name} onChange={setName} placeholder={t("auth.name_ph")} />
-      <Field label={t("auth.phone")} value={phone} onChange={(value) => setPhone((prev) => editUzPhone(value, prev))} placeholder="+998" keyboard="phone-pad" />
-      {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
-      <Pressable
-        onPress={() => void submit()}
-        disabled={busy}
-        accessibilityRole="button"
-        className={`mt-3 items-center rounded-2xl py-3 ${busy ? "bg-slate-200" : "bg-brand active:opacity-90"}`}
-      >
-        <Text className={`text-base font-bold ${busy ? "text-slate-500" : "text-white"}`}>{t("trip.register")}</Text>
-      </Pressable>
-    </View>
+    <PhoneCodeBox
+      kind="rider"
+      title={t("trip.rider")}
+      hint={t("trip.sms_hint")}
+      onVerified={async (pass) => {
+        const account = await api.registerTripAccount("rider", pass.name, pass.phone, pass.token);
+        const profile = { id: account.id, name: account.name, phone: formatUzPhone(account.phone), token: pass.token };
+        await saveTripProfile("rider", profile);
+        onDone(profile);
+      }}
+    />
   );
 }
 
 function RiderForm({
   draft = null,
   account,
-  driver = false,
   onSaved,
 }: {
   draft?: TripCard | null;
   account: TripProfile;
-  driver?: boolean;
   onSaved?: () => void;
 }) {
   const t = useT();
@@ -322,8 +261,6 @@ function RiderForm({
   const [seats, setSeats] = useState(draft?.seats ?? 1);
   const [price, setPrice] = useState(draft && draft.price > 0 ? String(draft.price) : "");
   const [note, setNote] = useState(draft?.note ?? "");
-  const [vehicle, setVehicle] = useState(draft?.vehicle ?? "");
-  const [photo, setPhoto] = useState<string | null>(draft?.photo ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -380,8 +317,8 @@ function RiderForm({
         seats,
         price: Number(price.replace(/\s/g, "")) || 0,
         note,
-        vehicle: driver ? vehicle : "",
-        photo: driver ? photo : null,
+        vehicle: "",
+        photo: null,
         accountId: account.id,
       };
       if (draft) await api.updateTrip(draft.id, account.id, payload);
@@ -419,34 +356,6 @@ function RiderForm({
       </View>
       <Field compact label={t("trip.price")} value={price} onChange={setPrice} placeholder={t("trip.deal")} keyboard="number-pad" />
       <Text className="mt-1 text-xs text-muted">{t("trip.price_hint")}</Text>
-      {driver ? (
-        <>
-          <Field compact label={t("trip.vehicle")} value={vehicle} onChange={setVehicle} placeholder={t("trip.vehicle_ph")} />
-          <Pressable
-            onPress={() => {
-              void pickAvatarPhoto()
-                .then((next) => {
-                  if (next) setPhoto(next);
-                })
-                .catch((caught: unknown) => {
-                  setError(caught instanceof Error ? caught.message : t("fail.generic"));
-                });
-            }}
-            accessibilityRole="button"
-            className="mt-3 flex-row items-center"
-          >
-            {photo ? (
-              <Image source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 36 }} />
-            ) : (
-              <View className="h-[72px] w-[72px] items-center justify-center rounded-full bg-white">
-                <Ionicons name="camera" size={22} color="#155EEF" />
-              </View>
-            )}
-            <Text className="ml-3 flex-1 text-sm font-semibold text-brand">{photo ? t("trip.photo_change") : t("trip.photo_add")}</Text>
-          </Pressable>
-          <Text className="mt-1 text-xs text-muted">{t("trip.photo_hint")}</Text>
-        </>
-      ) : null}
       <Field compact label={t("trip.note")} value={note} onChange={setNote} placeholder={t("trip.note_ph")} />
       {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
       <Pressable
@@ -566,236 +475,6 @@ function MyTrips({
           )}
         </View>
       ))}
-    </View>
-  );
-}
-
-function DriverBoard({ account }: { account: TripProfile }) {
-  const t = useT();
-  const [mode, setMode] = useState<"near" | "route">("near");
-  const [here, setHere] = useState<MapPoint | null>(null);
-  const [hereName, setHereName] = useState<string | null>(null);
-  const [routeFrom, setRouteFrom] = useState("");
-  const [routeTo, setRouteTo] = useState("Toshkent");
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [trips, setTrips] = useState<TripCard[]>([]);
-  const [desk, setDesk] = useState<"browse" | "post" | "mine">("browse");
-  const [editing, setEditing] = useState<TripCard | null>(null);
-  const [pass, setPass] = useState<TripPass | null>(null);
-  const [opened, setOpened] = useState<Record<string, { phone: string; address: string }>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function locate() {
-      try {
-        const permission = await Location.requestForegroundPermissionsAsync();
-        if (permission.status !== "granted") {
-          if (!cancelled) setGpsError(t("trip.gps_off"));
-          return;
-        }
-        const position = await Location.getCurrentPositionAsync({});
-        if (cancelled) return;
-        const point = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const near = nearestPlace(point);
-        setHere(point);
-        setHereName(near.place.name);
-        setRouteFrom(near.place.name);
-        setGpsError(null);
-      } catch {
-        if (!cancelled) setGpsError(t("trip.gps_off"));
-      }
-    }
-    void locate();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
-
-  const load = useCallback(async () => {
-    try {
-      setTrips(
-        await api.listTrips(
-          mode === "route"
-            ? { mode: "route", from: routeFrom, to: routeTo, lat: here?.lat, lng: here?.lng }
-            : { mode: "near", lat: here?.lat, lng: here?.lng },
-        ),
-      );
-      setPass(await api.tripPassStatus(account.id));
-      setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }, [mode, routeFrom, routeTo, here, account.id, t]);
-
-  useEffect(() => {
-    void load();
-    const timer = setInterval(() => void load(), 4000);
-    return () => clearInterval(timer);
-  }, [load]);
-
-  async function buy(tripId: string) {
-    try {
-      const next = await api.startTripPass(account.id);
-      setPass(next);
-      if (!tripId) return;
-      const revealed = await api.revealTripPhone(tripId, account.id);
-      if (revealed.ok) setOpened((prev) => ({ ...prev, [tripId]: { phone: revealed.phone, address: revealed.address } }));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }
-
-  async function openPhone(trip: TripCard) {
-    try {
-      const revealed = await api.revealTripPhone(trip.id, account.id);
-      if (revealed.ok) {
-        setOpened((prev) => ({ ...prev, [trip.id]: { phone: revealed.phone, address: revealed.address } }));
-        setError(null);
-        return;
-      }
-      Alert.alert(t("trip.pass_title"), t("trip.pass_body", { days: revealed.days, money: formatMoney(revealed.price) }), [
-        { text: t("no"), style: "cancel" },
-        { text: t("trip.pass_buy"), onPress: () => void buy(trip.id) },
-      ]);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("fail.generic"));
-    }
-  }
-
-  const until = pass?.active && pass.until ? dayStamp(pass.until) : "";
-
-  if (desk === "post") {
-    return (
-      <View className="mt-5">
-        <Pressable
-          onPress={() => {
-            setEditing(null);
-            setDesk("browse");
-          }}
-          accessibilityRole="button"
-          className="mb-3 flex-row items-center self-start"
-        >
-          <Ionicons name="chevron-back" size={18} color="#155EEF" />
-          <Text className="ml-1 text-sm font-semibold text-brand">{t("trip.back")}</Text>
-        </Pressable>
-        <RiderForm
-          key={editing?.id ?? "new"}
-          draft={editing}
-          driver
-          account={account}
-          onSaved={() => {
-            setEditing(null);
-            setDesk("mine");
-          }}
-        />
-      </View>
-    );
-  }
-
-  if (desk === "mine") {
-    return (
-      <View className="mt-5">
-        <Pressable
-          onPress={() => setDesk("browse")}
-          accessibilityRole="button"
-          className="mb-3 flex-row items-center self-start"
-        >
-          <Ionicons name="chevron-back" size={18} color="#155EEF" />
-          <Text className="ml-1 text-sm font-semibold text-brand">{t("trip.back")}</Text>
-        </Pressable>
-        <MyTrips
-          account={account}
-          onEdit={(trip) => {
-            setEditing(trip);
-            setDesk("post");
-          }}
-        />
-      </View>
-    );
-  }
-
-  return (
-    <View className="mt-5">
-      <Text className="text-base font-bold text-ink">{account.name}</Text>
-      <Text className="mt-1 text-sm text-muted">{account.phone}</Text>
-      <Text className="mt-1 text-sm font-bold text-ink">{t("trip.driver_id", { id: account.id })}</Text>
-      <Text className="mt-1 text-sm text-muted">{t("trip.pass_free")}</Text>
-      <Text className={`mt-3 text-sm ${hereName ? "font-semibold text-brand" : "text-muted"}`}>
-        {hereName ? t("trip.now", { place: hereName }) : (gpsError ?? t("trip.gps_off"))}
-      </Text>
-      <Text className={`mt-1 text-sm ${pass?.active ? "font-semibold text-brand" : "text-muted"}`}>
-        {pass?.active ? t("trip.pass_on", { date: until }) : t("trip.pass_off")}
-      </Text>
-      <Pressable
-        onPress={() => {
-          setEditing(null);
-          setDesk("post");
-        }}
-        accessibilityRole="button"
-        className="mt-4 items-center rounded-full bg-[#1290F9] py-3.5 active:opacity-90"
-      >
-        <Text className="text-base font-bold text-white">{t("trip.hub_post")}</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => setDesk("mine")}
-        accessibilityRole="button"
-        className="mt-2 items-center rounded-full bg-white py-3.5 active:opacity-90"
-      >
-        <Text className="text-base font-bold text-ink">{t("trip.my")}</Text>
-      </Pressable>
-      {pass && !pass.active ? (
-        <Pressable
-          onPress={() => void buy("")}
-          accessibilityRole="button"
-          className="mt-3 items-center rounded-2xl bg-[#C2410C] py-3"
-        >
-          <Text className="text-sm font-bold text-white">{t("trip.pass_buy")} · {formatMoney(pass.price)}</Text>
-        </Pressable>
-      ) : null}
-      <View className="mt-4 flex-row">
-        <Pressable
-          onPress={() => setMode("near")}
-          accessibilityRole="button"
-          className={`mr-2 flex-1 items-center rounded-2xl py-3 ${mode === "near" ? "bg-[#121212]" : "bg-white"}`}
-        >
-          <Text className={`text-sm font-semibold ${mode === "near" ? "text-white" : "text-muted"}`}>{t("trip.near")}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setMode("route")}
-          accessibilityRole="button"
-          className={`flex-1 items-center rounded-2xl py-3 ${mode === "route" ? "bg-[#121212]" : "bg-white"}`}
-        >
-          <Text className={`text-sm font-semibold ${mode === "route" ? "text-white" : "text-muted"}`}>{t("trip.route")}</Text>
-        </Pressable>
-      </View>
-      {mode === "near" ? (
-        <Text className="mt-2 text-xs text-muted">{t("trip.near_hint", { km: TRIP_NEAR_KM })}</Text>
-      ) : (
-        <>
-          <PlacePick label={t("trip.from")} value={routeFrom} onChange={(place) => setRouteFrom(place)} allowAny />
-          <PlacePick label={t("trip.to")} value={routeTo} onChange={(place) => setRouteTo(place)} allowAny />
-        </>
-      )}
-      {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
-      <View className="mt-4">
-        {trips.length === 0 ? (
-          <View className="rounded-3xl bg-white px-5 py-8">
-            <Text className="text-base font-semibold text-ink">{t("trip.empty")}</Text>
-            <Text className="mt-2 text-sm text-muted">{mode === "near" && !here ? t("trip.gps_off") : t("trip.empty_hint")}</Text>
-          </View>
-        ) : (
-          trips.map((trip) => (
-            <TripRow
-              key={trip.id}
-              trip={trip}
-              phone={opened[trip.id]?.phone}
-              address={opened[trip.id]?.address}
-              onPhone={() => void openPhone(trip)}
-            />
-          ))
-        )}
-      </View>
     </View>
   );
 }
