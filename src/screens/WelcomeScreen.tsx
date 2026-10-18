@@ -86,7 +86,7 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
     ...localBuilders.map((builder) => ({ kind: "builder" as const, at: builder.at, builder })),
   ]
     .sort((a, b) => b.at - a.at)
-    .slice(0, 20);
+    .slice(0, 12);
   const tile = boardWidth > 0 ? Math.floor((boardWidth - 16) / 3) : 0;
   const tileH = tile > 0 ? Math.round(tile * 0.92) : 0;
   const pickedJob = detail?.kind === "job" ? jobs.find((job) => job.id === detail.id) ?? null : null;
