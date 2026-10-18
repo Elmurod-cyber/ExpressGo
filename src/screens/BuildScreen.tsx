@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Screen } from "../components/Screen";
@@ -245,13 +246,77 @@ function Board({
 }
 
 function JobPhotos({ photos }: { photos: string[] }) {
+  const t = useT();
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const [index, setIndex] = useState<number | null>(null);
+  const [near, setNear] = useState(false);
   if (photos.length === 0) return null;
+  const uri = index == null ? "" : photos[index] ?? "";
+  const frameW = near ? width * 2.4 : width;
+  const frameH = near ? height * 1.7 : Math.max(height - insets.top - insets.bottom - 120, 280);
   return (
-    <View className="mt-2 flex-row flex-wrap">
-      {photos.map((uri, index) => (
-        <Image key={`${index}-${uri.length}`} source={{ uri }} style={{ width: 72, height: 72, borderRadius: 12, marginRight: 8, marginBottom: 8 }} />
-      ))}
-    </View>
+    <>
+      <View className="mt-2 flex-row flex-wrap">
+        {photos.map((item, itemIndex) => (
+          <Pressable
+            key={`${itemIndex}-${item.length}`}
+            onPress={() => {
+              setNear(false);
+              setIndex(itemIndex);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t("build.photo")}
+          >
+            <Image source={{ uri: item }} style={{ width: 72, height: 72, borderRadius: 12, marginRight: 8, marginBottom: 8 }} />
+          </Pressable>
+        ))}
+      </View>
+      <Modal visible={index != null} transparent animationType="fade" onRequestClose={() => setIndex(null)}>
+        <View className="flex-1 bg-black" style={{ paddingTop: insets.top }}>
+          <View className="flex-row items-center justify-between px-4 py-2">
+            <Text className="text-sm font-semibold text-white">{index != null && photos.length > 1 ? `${index + 1} / ${photos.length}` : ""}</Text>
+            <Pressable onPress={() => setIndex(null)} accessibilityRole="button" accessibilityLabel={t("close")} className="h-10 w-10 items-center justify-center rounded-full bg-white/15">
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          <ScrollView maximumZoomScale={4} minimumZoomScale={1} centerContent contentContainerStyle={{ alignItems: "center", justifyContent: "center", minHeight: height * 0.62 }}>
+            {uri ? <Image source={{ uri }} resizeMode="contain" style={{ width: frameW, height: frameH }} /> : null}
+          </ScrollView>
+          <View className="flex-row items-center justify-center px-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            {photos.length > 1 ? (
+              <Pressable
+                onPress={() => {
+                  setNear(false);
+                  setIndex((current) => (current == null ? 0 : (current + photos.length - 1) % photos.length));
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("build.photo_prev")}
+                className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-white/15"
+              >
+                <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => setNear((value) => !value)} accessibilityRole="button" className="rounded-full bg-white px-5 py-3">
+              <Text className="text-sm font-bold text-black">{near ? t("build.photo_fit") : t("build.photo_near")}</Text>
+            </Pressable>
+            {photos.length > 1 ? (
+              <Pressable
+                onPress={() => {
+                  setNear(false);
+                  setIndex((current) => (current == null ? 0 : (current + 1) % photos.length));
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("build.photo_next")}
+                className="ml-3 h-11 w-11 items-center justify-center rounded-full bg-white/15"
+              >
+                <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
