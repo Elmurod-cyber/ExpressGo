@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 import { verifyInitData } from "./partner";
-import { kitchenStep, linkKitchenChat, listKitchenForPhone, placeFoodOrder, requestGuestCode, verifyGuestCode } from "./store";
+import { kitchenReport, kitchenStep, linkKitchenChat, listKitchenForPhone, placeFoodOrder, requestGuestCode, setKitchenOpen, verifyGuestCode } from "./store";
 import { readDevOtp } from "./sms";
 
 test("telegram imzosi restoran chatini ajratadi", () => {
@@ -46,4 +46,47 @@ test("oshxona qabul qiladi va olib ketishda kuryer chaqirmaydi", async () => {
   assert.match(ready.note, /olib ketadi/);
   const rows = listKitchenForPhone("998902223377");
   assert.equal(rows.some((item) => item.id === ticket.id), true);
+});
+
+test("yopiq restoran yangi zakazni olmaydi", async () => {
+  process.env.EG_OTP_DEV = "1";
+  const phone = "998900000124";
+  await requestGuestCode("food", phone);
+  const code = readDevOtp(phone);
+  if (!code) throw new Error("Kod saqlanmadi.");
+  const pass = await verifyGuestCode("food", phone, code, "Vali");
+  const before = kitchenReport("998902223377");
+  assert.equal(setKitchenOpen("90 222 33 77", false), false);
+  await assert.rejects(
+    () =>
+      placeFoodOrder({
+        placeId: "shahrixon",
+        placeName: "Shahrixon Fastfood",
+        pickup: "Shahrixon markaz",
+        staffPhone: "998902223377",
+        name: "Vali",
+        phone,
+        dropoff: "Shahrixon markaz",
+        handoff: "pickup",
+        lines: [{ name: "Lavash", qty: 1, price: 28000 }],
+        guestToken: pass.token,
+      }),
+    /qabul qilmayapti/,
+  );
+  assert.equal(setKitchenOpen("998902223377", true), true);
+  await placeFoodOrder({
+    placeId: "shahrixon",
+    placeName: "Shahrixon Fastfood",
+    pickup: "Shahrixon markaz",
+    staffPhone: "998902223377",
+    name: "Vali",
+    phone,
+    dropoff: "Shahrixon markaz",
+    handoff: "pickup",
+    lines: [{ name: "Lavash", qty: 1, price: 28000 }],
+    guestToken: pass.token,
+  });
+  const after = kitchenReport("998902223377");
+  assert.equal(after.count, before.count + 1);
+  assert.equal(after.total, before.total + 28000);
 });

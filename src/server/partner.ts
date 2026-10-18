@@ -1,12 +1,15 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { kitchenByPhone } from "./kitchens";
+import { kitchenByPhone, kitchenMenu } from "./kitchens";
 import {
+  foodPlaceOpen,
   kitchenChatForPhone,
   kitchenPhoneForChat,
+  kitchenReport,
   kitchenStep,
   linkKitchenChat,
   listKitchenForPhone,
+  setKitchenOpen,
 } from "./store";
 
 type Notice = {
@@ -149,27 +152,62 @@ function partnerHtml(): string {
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body { margin: 0; font-family: sans-serif; background: #f4f6fb; color: #171717; }
-    header { background: #ff8a00; color: #171717; padding: 14px 16px; font-weight: 800; }
-    main { padding: 12px; }
+    header { background: #ff8a00; color: #171717; padding: 14px 16px 12px; }
+    header b { font-size: 18px; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+    h1 { margin: 0; font-size: 20px; }
+    main { padding: 12px 12px 88px; }
     .card { background: #fff; border-radius: 18px; padding: 12px; margin-bottom: 12px; }
     .tag { font-size: 12px; font-weight: 800; letter-spacing: .04em; }
-    button { width: 100%; border: 0; border-radius: 12px; padding: 12px; font-weight: 800; margin-top: 8px; }
+    button.act { width: 100%; border: 0; border-radius: 12px; padding: 12px; font-weight: 800; margin-top: 8px; }
     .ok { background: #17803d; color: #fff; }
     .no { background: #dc2626; color: #fff; }
     .go { background: #1290f9; color: #fff; }
     .muted { color: #667085; font-size: 14px; }
     .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; }
+    .switch { border: 0; border-radius: 999px; padding: 8px 12px; font-weight: 800; }
+    .on { background: #dcfce7; color: #166534; }
+    .off { background: #fee2e2; color: #991b1b; }
+    nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: #fff; border-top: 1px solid #e4e7ec; }
+    nav button { flex: 1; border: 0; background: #fff; padding: 12px 4px 16px; font-size: 12px; font-weight: 700; color: #667085; }
+    nav button.here { color: #c2410c; }
   </style>
 </head>
 <body>
-  <header>ExpressGo Partner</header>
+  <header>
+    <b>ExpressGo Partner</b>
+    <div class="top">
+      <h1 id="title">Oshxona</h1>
+      <button id="gate" class="switch off" type="button">Yopiq</button>
+    </div>
+    <p id="address" class="muted" style="margin:6px 0 0"></p>
+  </header>
   <main id="app">Yuklanmoqda...</main>
+  <nav>
+    <button type="button" data-tab="orders">Buyurtmalar</button>
+    <button type="button" data-tab="menu">Menyu</button>
+    <button type="button" data-tab="report">Hisobot</button>
+    <button type="button" data-tab="profile">Profil</button>
+  </nav>
   <script>
     const app = document.getElementById("app");
+    const title = document.getElementById("title");
+    const address = document.getElementById("address");
+    const gate = document.getElementById("gate");
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { tg.ready(); tg.expand(); }
     const initData = tg ? tg.initData : "";
+    let tab = "orders";
+    let latest = null;
     function money(n) { return String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, " ") + " so'm"; }
+    function esc(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+    function phoneText(digits) {
+      const d = String(digits).replace(/\\D/g, "");
+      if (d.length !== 12) return "+" + d;
+      return "+" + d.slice(0, 3) + " " + d.slice(3, 5) + " " + d.slice(5, 8) + " " + d.slice(8, 10) + " " + d.slice(10);
+    }
     function label(status) {
       if (status === "new") return "YANGI BUYURTMA";
       if (status === "sent") return "KURYERGA YUBORILDI";
@@ -177,30 +215,61 @@ function partnerHtml(): string {
       return "TAYYORLANMOQDA";
     }
     function card(ticket) {
-      const lines = ticket.lines.map((line) => '<div class="row"><span>' + line.qty + '× ' + line.name + '</span><span>' + money(line.qty * line.price) + '</span></div>').join("");
-      const where = ticket.handoff === "pickup" ? "Mijoz o'zi olib ketadi" : ticket.dropoff;
+      const lines = ticket.lines.map((line) => '<div class="row"><span>' + esc(line.qty) + '× ' + esc(line.name) + '</span><span>' + money(line.qty * line.price) + '</span></div>').join("");
+      const where = ticket.handoff === "pickup" ? "Mijoz o'zi olib ketadi" : esc(ticket.dropoff);
       let buttons = "";
       if (ticket.status === "new") {
-        buttons = '<button class="ok" data-act="accept" data-id="' + ticket.id + '">Qabul qilish</button><button class="no" data-act="reject" data-id="' + ticket.id + '">Bekor qilish</button>';
+        buttons = '<button class="act ok" data-act="accept" data-id="' + esc(ticket.id) + '">Qabul qilish</button><button class="act no" data-act="reject" data-id="' + esc(ticket.id) + '">Bekor qilish</button>';
       } else if (ticket.status === "accepted" || ticket.status === "preparing" || (ticket.status === "ready" && ticket.handoff !== "pickup")) {
         const caption = ticket.handoff === "pickup" ? "Tayyor, mijoz olib ketadi" : "Tayyor bo'ldi (kuryer chaqirish)";
-        buttons = '<button class="go" data-act="ready" data-id="' + ticket.id + '">' + caption + '</button>';
+        buttons = '<button class="act go" data-act="ready" data-id="' + esc(ticket.id) + '">' + caption + '</button>';
       }
-      return '<article class="card"><div class="tag">' + label(ticket.status) + '</div>' + lines + '<div class="row"><b>Jami</b><b>' + money(ticket.foodTotal) + '</b></div><p class="muted">' + where + '<br>' + ticket.customerName + ' · ' + ticket.customerPhone + '</p>' + buttons + '</article>';
+      return '<article class="card"><div class="tag">' + label(ticket.status) + '</div>' + lines + '<div class="row"><b>Jami</b><b>' + money(ticket.foodTotal) + '</b></div><p class="muted">' + where + '<br>' + esc(ticket.customerName) + ' · ' + esc(ticket.customerPhone) + '</p>' + buttons + '</article>';
     }
-    async function load(action, ticketId) {
-      const response = await fetch("/partner/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData, action, ticketId }) });
+    function paint() {
+      if (!latest) return;
+      title.textContent = latest.place.name;
+      address.textContent = latest.place.address;
+      gate.textContent = latest.open ? "Onlayn" : "Yopiq";
+      gate.className = latest.open ? "switch on" : "switch off";
+      gate.dataset.on = latest.open ? "1" : "0";
+      document.querySelectorAll("nav button").forEach((button) => {
+        button.className = button.dataset.tab === tab ? "here" : "";
+      });
+      if (tab === "menu") {
+        const rows = latest.menu.map((item) => '<div class="row"><span>' + esc(item.name) + '</span><b>' + money(item.price) + '</b></div>').join("");
+        app.innerHTML = '<article class="card"><div class="tag">MENYU</div>' + (rows || '<p class="muted">Menyu yo\\'q</p>') + '</article>';
+        return;
+      }
+      if (tab === "report") {
+        app.innerHTML = '<article class="card"><div class="tag">BUGUN</div><div class="row"><span>Buyurtma</span><b>' + latest.report.count + '</b></div><div class="row"><span>Jami</span><b>' + money(latest.report.total) + '</b></div><p class="muted">Bekor qilinganlar hisobga kirmaydi.</p></article>';
+        return;
+      }
+      if (tab === "profile") {
+        app.innerHTML = '<article class="card"><div class="tag">PROFIL</div><p><b>' + esc(latest.place.name) + '</b></p><p class="muted">' + esc(latest.place.address) + '</p><p>' + esc(phoneText(latest.place.phone)) + '</p><p class="muted">Onlayn yoniq bo\\'lsa mijoz zakaz yubora oladi. O\\'chiq bo\\'lsa yangi zakaz to\\'xtaydi.</p></article>';
+        return;
+      }
+      const note = latest.note ? '<p class="muted">' + esc(latest.note) + '</p>' : "";
+      const list = latest.tickets.length ? latest.tickets.map(card).join("") : '<p class="muted">Hozircha buyurtma yo\\'q</p>';
+      app.innerHTML = note + list;
+    }
+    async function load(action, ticketId, accepting) {
+      const response = await fetch("/partner/api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData, action, ticketId, accepting }),
+      });
       const data = await response.json();
       if (!response.ok) { app.textContent = data.error || "Xato"; return; }
-      const title = '<h2 style="margin:8px 0">' + data.place.name + '</h2><p class="muted">' + data.place.address + '</p>';
-      const note = data.note ? '<p class="muted">' + data.note + '</p>' : "";
-      const list = data.tickets.length ? data.tickets.map(card).join("") : '<p class="muted">Hozircha buyurtma yo\\'q</p>';
-      app.innerHTML = title + note + list;
+      latest = data;
+      paint();
     }
-    app.addEventListener("click", (event) => {
+    document.body.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
-      void load(button.dataset.act, button.dataset.id);
+      if (button.dataset.tab) { tab = button.dataset.tab; paint(); return; }
+      if (button.id === "gate") { void load("open", "", button.dataset.on !== "1"); return; }
+      if (button.dataset.act) void load(button.dataset.act, button.dataset.id);
     });
     if (!initData) app.textContent = "Oshxonani Telegram bot ichida oching.";
     else void load();
@@ -242,7 +311,7 @@ export async function handlePartner(req: IncomingMessage, res: ServerResponse, o
   }
   if (req.method === "POST" && path === "/partner/api") {
     try {
-      const body = JSON.parse((await readBody(req)) || "{}") as { initData?: string; action?: string; ticketId?: string };
+      const body = JSON.parse((await readBody(req)) || "{}") as { initData?: string; action?: string; ticketId?: string; accepting?: boolean };
       const chatId = verifyInitData(body.initData ?? "", botToken());
       const phone = chatId == null ? null : kitchenPhoneForChat(chatId);
       if (!phone) {
@@ -251,15 +320,31 @@ export async function handlePartner(req: IncomingMessage, res: ServerResponse, o
         return true;
       }
       const place = kitchenByPhone(phone);
+      if (!place) {
+        res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "Bu telefon restoranga tegishli emas." }));
+        return true;
+      }
       let note = "";
       if (body.action === "accept" || body.action === "reject" || body.action === "ready") {
         const step = await kitchenStep(phone, body.ticketId ?? "", body.action);
         note = step.note;
         onHandled?.();
       }
+      if (body.action === "open") {
+        setKitchenOpen(phone, body.accepting === true);
+        onHandled?.();
+      }
       const tickets = listKitchenForPhone(phone);
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ place, tickets, note }));
+      res.end(JSON.stringify({
+        place,
+        open: foodPlaceOpen(place.id),
+        tickets,
+        menu: kitchenMenu(place.id),
+        report: kitchenReport(phone),
+        note,
+      }));
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Xato";
       res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });

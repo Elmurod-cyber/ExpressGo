@@ -2415,6 +2415,26 @@ export function listKitchenForPhone(phone: string): FoodTicket[] {
     .map(toFoodTicket);
 }
 
+export function setKitchenOpen(phone: string, accepting: boolean): boolean {
+  const place = kitchenByPhone(phone);
+  if (!place) fail("Bu telefon restoranga tegishli emas.");
+  const row = foodOpen.find((item) => item.placeId === place.id);
+  if (row) row.accepting = accepting;
+  else foodOpen.push({ placeId: place.id, accepting });
+  return foodIsOpen(place.id);
+}
+
+export function kitchenReport(phone: string): { count: number; total: number } {
+  const place = kitchenByPhone(phone);
+  if (!place) fail("Bu telefon restoranga tegishli emas.");
+  const offset = 5 * 60 * 60 * 1000;
+  const start = Math.floor((Date.now() + offset) / 86_400_000) * 86_400_000 - offset;
+  const rows = foodTickets.filter(
+    (row) => samePhone(row.staffPhone, place.phone) && row.at >= start && row.status !== "rejected" && row.status !== "cancelled",
+  );
+  return { count: rows.length, total: rows.reduce((sum, row) => sum + row.foodTotal, 0) };
+}
+
 export async function kitchenStep(phone: string, ticketId: string, action: "accept" | "reject" | "ready"): Promise<{ ticket: FoodTicket; note: string }> {
   const place = kitchenByPhone(phone);
   const row = foodTickets.find((item) => item.id === ticketId && place && samePhone(item.staffPhone, place.phone));
