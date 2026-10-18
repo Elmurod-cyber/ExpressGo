@@ -364,7 +364,6 @@ function RiderForm({
       >
         <Text className={`text-base font-bold ${busy ? "text-slate-500" : "text-white"}`}>{draft ? t("trip.save") : t("trip.post")}</Text>
       </Pressable>
-      <LiveTrips />
     </View>
   );
 }
