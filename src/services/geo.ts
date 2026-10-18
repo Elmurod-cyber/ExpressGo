@@ -4,6 +4,7 @@ import { kmBetween } from "./distance";
 import { PLACES } from "../server/places";
 import { listCustomLocations, noteCustomLocation } from "../server/store";
 import { scheduleStoreSave } from "../server/persist";
+import { addressInUzbek, hasCyrillic } from "./uzbekAddress";
 
 export type { MapPoint } from "./distance";
 export { kmBetween } from "./distance";
@@ -263,11 +264,24 @@ function placePart(value?: string | null): string {
   return text;
 }
 
-function shortAddress(street?: string | null, area?: string | null): string {
-  const road = placePart(street);
-  const mahalla = placePart(area);
-  if (road && mahalla && foldName(road) !== foldName(mahalla)) return `${road}, ${mahalla}`;
-  return road || mahalla;
+function mergeParts(parts: string[]): string[] {
+  const out: string[] = [];
+  for (const part of parts) {
+    const folded = foldName(part);
+    if (!folded) continue;
+    const index = out.findIndex((item) => {
+      const other = foldName(item);
+      return other === folded || other.includes(folded) || folded.includes(other);
+    });
+    if (index === -1) out.push(part);
+    else if (part.length > out[index].length) out[index] = part;
+  }
+  return out;
+}
+
+function uzbekStreet(label: string): string {
+  const parts = label.split(",").map((part) => addressInUzbek(part)).filter(Boolean);
+  return parts.find((part) => /ko'cha|mahalla|qishloq/i.test(part)) ?? "";
 }
 
 async function nominatimShort(point: MapPoint): Promise<string> {
@@ -275,17 +289,25 @@ async function nominatimShort(point: MapPoint): Promise<string> {
   const response = await fetch(url, { headers: NOMINATIM_HEADERS });
   if (!response.ok) return "";
   const data = (await response.json()) as { address?: Record<string, string> };
-  const address = data.address;
-  const street = address?.road || address?.pedestrian || address?.footway;
-  const area =
-    address?.suburb ||
-    address?.neighbourhood ||
-    address?.quarter ||
-    address?.city_district ||
-    address?.residential ||
-    address?.village ||
-    address?.hamlet;
-  return shortAddress(street, area);
+  const address = data.address ?? {};
+  const road = placePart(address.road) || placePart(address.pedestrian) || placePart(address.footway);
+  const street = [addressInUzbek(road), placePart(address.house_number)].filter(Boolean).join(" ");
+  const local =
+    placePart(address.suburb) ||
+    placePart(address.neighbourhood) ||
+    placePart(address.quarter) ||
+    placePart(address.city_district) ||
+    placePart(address.residential) ||
+    placePart(address.village) ||
+    placePart(address.hamlet) ||
+    placePart(address.city) ||
+    placePart(address.town);
+  const parts = mergeParts([street, addressInUzbek(local), addressInUzbek(placePart(address.county)), addressInUzbek(placePart(address.state))]);
+  if (street) {
+    const place = parts.find((part) => foldName(part) !== foldName(street));
+    return place ? `${street}, ${place}` : street;
+  }
+  return parts.slice(0, 2).join(", ");
 }
 
 function namedAddress(district: string, street: string): string {
@@ -308,17 +330,27 @@ async function deviceShort(point: MapPoint): Promise<string> {
 }
 
 async function describePointLabel(point: MapPoint): Promise<string> {
+  let remote = "";
   try {
-    const label = await deviceShort(point);
-    if (label) return label;
-  } catch {
-    // Webda yoki ruxsatsiz teskari geokod yo'q.
-  }
-  try {
-    const label = await nominatimShort(point);
-    if (label) return label;
+    remote = await nominatimShort(point);
   } catch {
     // Tarmoq yoki CORS.
   }
+  let device = "";
+  try {
+    device = await deviceShort(point);
+  } catch {
+    // Webda yoki ruxsatsiz teskari geokod yo'q.
+  }
+  const street = uzbekStreet(device);
+  if (street && remote && !foldName(remote).includes(foldName(street))) {
+    const place = remote.split(",")[0]?.trim() ?? "";
+    if (place && foldName(place) !== foldName(street)) return `${street}, ${place}`;
+    return street;
+  }
+  if (remote && !hasCyrillic(remote)) return remote;
+  const local = addressInUzbek(device);
+  if (local && !hasCyrillic(local)) return local;
+  if (remote) return addressInUzbek(remote);
   return `Tanlangan nuqta (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
 }
