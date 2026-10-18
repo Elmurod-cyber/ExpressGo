@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { Screen } from "../components/Screen";
 import { useT } from "../context/Session";
 import { useArea } from "../context/Area";
@@ -243,6 +244,17 @@ function Board({
   );
 }
 
+function JobPhotos({ photos }: { photos: string[] }) {
+  if (photos.length === 0) return null;
+  return (
+    <View className="mt-2 flex-row flex-wrap">
+      {photos.map((uri, index) => (
+        <Image key={`${index}-${uri.length}`} source={{ uri }} style={{ width: 72, height: 72, borderRadius: 12, marginRight: 8, marginBottom: 8 }} />
+      ))}
+    </View>
+  );
+}
+
 function AdCard({ card }: { card: BuilderCard }) {
   const t = useT();
   const digits = card.phone.replace(/\D/g, "");
@@ -257,6 +269,7 @@ function AdCard({ card }: { card: BuilderCard }) {
       <Text className="mt-1 text-base font-bold text-ink">{tradeLabel(t, card.trade) || card.name}</Text>
       {card.name ? <Text className="mt-1 text-sm text-muted">{card.name}</Text> : null}
       <Text className="mt-2 text-sm leading-5 text-ink">{card.text}</Text>
+      <JobPhotos photos={card.photos ?? []} />
       {place ? <Text className="mt-2 text-sm text-muted">{place}</Text> : null}
       {card.kind === "offer" && street ? <Text className="mt-1 text-sm text-ink">{street}</Text> : null}
       {card.kind === "job" && !card.contactOpen ? <Text className="mt-1 text-sm text-muted">{t("build.locked_address")}</Text> : null}
@@ -315,8 +328,32 @@ function AdForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tradeOpen, setTradeOpen] = useState(false);
+  const [photos, setPhotos] = useState<string[]>(() => (draft?.photos?.length ? draft.photos.slice(0, 4) : draft?.photo ? [draft.photo] : []));
   const chosen = trade === "other" ? custom.trim() : trade;
   const tradeName = trade === "other" ? custom.trim() || t("build.other") : trade ? t(`build.t.${trade}`) : "";
+
+  async function addPhoto() {
+    if (photos.length >= 4) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError(t("build.photo_need"));
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.35,
+      base64: true,
+    });
+    const shot = picked.canceled ? "" : picked.assets[0]?.base64 ?? "";
+    if (!shot) return;
+    const uri = `data:image/jpeg;base64,${shot}`;
+    if (uri.length > 400_000) {
+      setError(t("build.photo_big"));
+      return;
+    }
+    setPhotos((prev) => (prev.length >= 4 ? prev : [...prev, uri]));
+    setError(null);
+  }
 
   async function submit() {
     if (chosen.length < 2) {
@@ -344,6 +381,7 @@ function AdForm({
       payKind: kind === "job" ? payKind : price.trim() ? "fixed" : "",
       term: kind === "job" ? term : "",
       workers: kind === "job" ? workers : 0,
+      photos: kind === "job" ? photos : [],
       guestToken: kind === "job" ? ownerToken : null,
     };
     try {
@@ -413,6 +451,37 @@ function AdForm({
             multiline
             className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
           />
+        </View>
+      ) : null}
+      {kind === "job" ? (
+        <View className="mt-3">
+          <Text className="text-sm font-medium text-ink">{t("build.photo")}</Text>
+          <Text className="mt-0.5 text-xs text-muted">{t("build.photos_hint")}</Text>
+          <View className="mt-2 flex-row flex-wrap">
+            {photos.map((uri, index) => (
+              <View key={`${index}-${uri.length}`} className="relative mb-2 mr-2">
+                <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 12 }} />
+                <Pressable
+                  onPress={() => setPhotos((prev) => prev.filter((_, item) => item !== index))}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("close")}
+                  className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/70"
+                >
+                  <Ionicons name="close" size={14} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+            {photos.length < 4 ? (
+              <Pressable
+                onPress={() => void addPhoto()}
+                accessibilityRole="button"
+                accessibilityLabel={t("build.photo_add")}
+                className="mb-2 h-[72px] w-[72px] items-center justify-center rounded-xl border border-dashed border-[#C2410C] bg-white"
+              >
+                <Ionicons name="image-outline" size={22} color="#C2410C" />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       ) : null}
       {kind === "offer" ? <Field label={t("build.experience")} value={experience} onChange={setExperience} placeholder={t("build.experience_ph")} /> : null}
@@ -528,6 +597,7 @@ function MineAds({
           <Text className="text-base font-bold text-ink">{tradeLabel(t, card.trade) || card.name}</Text>
           <Text className="mt-1 text-sm text-muted">{[card.region, card.area].filter(Boolean).join(", ")}</Text>
           {card.address ? <Text className="mt-1 text-sm text-ink">{card.address}</Text> : null}
+          <JobPhotos photos={card.photos ?? []} />
           <Text className="mt-1 text-sm font-semibold text-ink">{card.phone}</Text>
           {card.status === "filled" ? <Text className="mt-2 text-sm font-semibold text-[#C2410C]">{t("build.closed")}</Text> : null}
           {card.status === "filled" ? null : confirmId === card.id ? (

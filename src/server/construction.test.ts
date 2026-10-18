@@ -148,3 +148,51 @@ test("usta bir oy bepul, keyin obunasiz manzil va telefon yopiq", async () => {
   assert.equal(unlocked?.address, street);
   await assert.rejects(startMasterSub("998900000088"));
 });
+
+test("ish e'loniga 4 tagacha ixtiyoriy rasm qo'shiladi", async () => {
+  process.env.EG_OTP_DEV = "1";
+  const phone = "998900000088";
+  await requestGuestCode("employer", phone);
+  const code = readDevOtp(phone);
+  if (!code) throw new Error("Kod saqlanmadi.");
+  const pass = await verifyGuestCode("employer", phone, code, "Sardor");
+  const shot = "data:image/jpeg;base64,abc";
+  const card = await postBuilder({
+    kind: "job",
+    name: "Sardor",
+    phone,
+    guestToken: pass.token,
+    trade: "paint",
+    region: "Andijon",
+    area: "Shahrixon",
+    address: "Bog ko'cha 8",
+    text: "Bo'yoqchi kerak, 2 kunlik ish.",
+    payKind: "deal",
+    term: "day",
+    workers: 1,
+    photos: [shot, shot, shot, shot],
+  });
+  assert.equal(card.photos.length, 4);
+  assert.equal(card.photo, shot);
+  const hidden = await listBuilders("job");
+  const row = hidden.find((item) => item.id === card.id);
+  assert.equal(row?.photos.length, 4);
+  await assert.rejects(
+    postBuilder({
+      kind: "job",
+      name: "Sardor",
+      phone,
+      guestToken: pass.token,
+      trade: "paint",
+      region: "Andijon",
+      area: "Shahrixon",
+      address: "Bog ko'cha 8",
+      text: "Bo'yoqchi kerak, 2 kunlik ish.",
+      payKind: "deal",
+      term: "day",
+      workers: 1,
+      photos: [shot, shot, shot, shot, shot],
+    }),
+    /4 tadan/,
+  );
+});

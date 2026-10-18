@@ -13,6 +13,7 @@ export type BuilderCard = {
   address: string;
   text: string;
   photo: string | null;
+  photos: string[];
   stars: number | null;
   ratingCount: number;
   at: number;

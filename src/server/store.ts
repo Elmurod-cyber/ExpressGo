@@ -321,6 +321,7 @@ export type StoredConstructionJob = {
   address: string;
   text: string;
   photo: string | null;
+  photos: string[];
   price: number | null;
   payKind: "" | "deal" | "fixed";
   term: "" | "day" | "temp" | "steady";
@@ -369,6 +370,7 @@ function storedJob(row: BuilderRecord): StoredConstructionJob {
     address: row.address,
     text: row.text,
     photo: row.photo,
+    photos: row.photos ?? (row.photo ? [row.photo] : []),
     price: row.price ?? null,
     payKind: pay,
     term,
@@ -388,6 +390,7 @@ function jobFromStored(row: StoredConstructionJob): BuilderRecord {
     address: row.address,
     text: row.text,
     photo: row.photo,
+    photos: row.photos,
     ratings: [],
     at: row.at,
     region: row.region,
@@ -466,6 +469,7 @@ type BuilderRecord = {
   address: string;
   text: string;
   photo: string | null;
+  photos?: string[];
   ratings: BuilderRating[];
   at: number;
   region?: string;
@@ -844,6 +848,16 @@ function proofOf(record: OrderProof): OrderProof {
 function optionalPhoto(uri: string | null | undefined): string | null {
   const value = (uri ?? "").trim();
   return value || null;
+}
+
+function jobPhotos(list: string[] | null | undefined, single: string | null | undefined): string[] {
+  const raw = Array.isArray(list) && list.length > 0 ? list : single ? [single] : [];
+  const photos = raw.map((item) => String(item).trim()).filter((item) => item.startsWith("data:image/"));
+  if (photos.length > 4) fail("4 tadan ko'p rasm bo'lmaydi.");
+  for (const shot of photos) {
+    if (shot.length > 400_000) fail("Rasm juda katta. Boshqa rasm tanlang.");
+  }
+  return photos;
 }
 
 function requirePhoto(uri: string | null | undefined, message: string): string {
@@ -3860,7 +3874,8 @@ function toBuilderCard(row: BuilderRecord): BuilderCard {
     trade: row.trade,
     address: row.address,
     text: row.text,
-    photo: row.photo,
+    photo: row.photos?.[0] ?? row.photo,
+    photos: (row.photos ?? (row.photo ? [row.photo] : [])).slice(0, 4),
     stars: score.stars,
     ratingCount: score.count,
     at: row.at,
@@ -3970,6 +3985,7 @@ export type BuilderWrite = {
   address?: string | null;
   text: string;
   photo?: string | null;
+  photos?: string[] | null;
   region?: string | null;
   area?: string | null;
   experience?: string | null;
@@ -3998,7 +4014,8 @@ function readBuilderBody(input: BuilderWrite): Omit<BuilderRecord, "id" | "at" |
   let address = (input.address ?? "").trim();
   if (!address && (region || area)) address = [region, area].filter(Boolean).join(", ");
   const text = input.text.trim();
-  const photo = optionalPhoto(input.photo);
+  const photos = input.kind === "job" ? jobPhotos(input.photos, input.photo) : [];
+  const photo = photos[0] ?? optionalPhoto(input.photo);
   const experience = (input.experience ?? "").trim();
   const payKind = readPay(input.payKind);
   const term = readTerm(input.term);
@@ -4026,6 +4043,7 @@ function readBuilderBody(input: BuilderWrite): Omit<BuilderRecord, "id" | "at" |
     address,
     text,
     photo,
+    photos,
     region,
     area,
     experience,
