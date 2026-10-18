@@ -6,7 +6,8 @@ import { connectDeliveryDatabase } from "./deliveryPg";
 import { connectTripDatabase, tripRepository } from "./tripDb";
 import { connectConstructionDatabase, constructionRepository } from "./constructionDb";
 import { connectFoodDatabase, saveFoodCartRows, saveFoodOrderRow, saveFoodUserRow } from "./foodDb";
-import { setFoodPersist } from "./foodPersist";
+import { setFoodNotify, setFoodPersist } from "./foodPersist";
+import { armTelegram, notifyKitchen } from "./partner";
 import { createRpcServer } from "./rpcHttp";
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -90,6 +91,10 @@ void (async () => {
     setFoodPersist({ saveUser: saveFoodUserRow, saveCart: saveFoodCartRows, saveOrder: saveFoodOrderRow });
     console.log("Taom jadvali ulangan.");
   } else console.warn(food.reason);
+  setFoodNotify((info) => {
+    void notifyKitchen(info);
+  });
+  await armTelegram();
 
   const construction = await connectConstructionDatabase();
   if (construction.ok) {

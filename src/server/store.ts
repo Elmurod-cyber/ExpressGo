@@ -6,7 +6,8 @@ import { roadRoute, roadTrip, routeTargetKey } from "../services/route";
 import { formatMoney } from "../services/money";
 import { t, tx } from "../i18n";
 import { accountNotify } from "./notifyBus";
-import { persistFoodCart, persistFoodOrder, persistFoodUser } from "./foodPersist";
+import { notifyFoodOrder, persistFoodCart, persistFoodOrder, persistFoodUser } from "./foodPersist";
+import { kitchenByPhone } from "./kitchens";
 import type {
   Account,
   AdCard,
@@ -426,6 +427,7 @@ export async function useConstructionRepository(repo: ConstructionRepository): P
 }
 const builders: BuilderRecord[] = [];
 const foodTickets: FoodTicketRecord[] = [];
+const kitchenLinks: { phone: string; chatId: number }[] = [];
 const foodOpen: { placeId: string; accepting: boolean }[] = [];
 
 type FoodOwner = {
@@ -2371,7 +2373,68 @@ export async function placeFoodOrder(input: {
     },
   }).catch(() => undefined);
   void persistFoodCart(phone, name, placeId, []).catch(() => undefined);
+  notifyFoodOrder({
+    ticketId: row.id,
+    placeName,
+    staffPhone,
+    customerName: name,
+    dropoff,
+    handoff,
+    lines: row.lines.map((line) => ({ name: line.name, qty: line.qty })),
+    total: row.foodTotal,
+  });
   return toFoodTicket(row);
+}
+
+export function linkKitchenChat(phone: string, chatId: number): { name: string; address: string } {
+  const place = kitchenByPhone(phone);
+  if (!place || !Number.isFinite(chatId)) fail("Bu telefon restoranga tegishli emas.");
+  const next = { phone: place.phone, chatId };
+  const found = kitchenLinks.findIndex((item) => item.phone === place.phone || item.chatId === chatId);
+  if (found >= 0) kitchenLinks[found] = next;
+  else kitchenLinks.push(next);
+  return { name: place.name, address: place.address };
+}
+
+export function kitchenPhoneForChat(chatId: number): string | null {
+  return kitchenLinks.find((item) => item.chatId === chatId)?.phone ?? null;
+}
+
+export function kitchenChatForPhone(phone: string): number | null {
+  const place = kitchenByPhone(phone);
+  if (!place) return null;
+  return kitchenLinks.find((item) => item.phone === place.phone)?.chatId ?? null;
+}
+
+export function listKitchenForPhone(phone: string): FoodTicket[] {
+  const place = kitchenByPhone(phone);
+  if (!place) fail("Bu telefon restoranga tegishli emas.");
+  return foodTickets
+    .filter((row) => samePhone(row.staffPhone, place.phone) && row.status !== "rejected" && row.status !== "cancelled")
+    .sort((a, b) => b.at - a.at)
+    .map(toFoodTicket);
+}
+
+export async function kitchenStep(phone: string, ticketId: string, action: "accept" | "reject" | "ready"): Promise<{ ticket: FoodTicket; note: string }> {
+  const place = kitchenByPhone(phone);
+  const row = foodTickets.find((item) => item.id === ticketId && place && samePhone(item.staffPhone, place.phone));
+  if (!place || !row) fail("E'lon topilmadi.");
+  if (action === "reject") {
+    moveFoodStatus(row, "rejected");
+    return { ticket: toFoodTicket(row), note: "Buyurtma bekor qilindi." };
+  }
+  if (action === "accept") {
+    if (row.status === "new") moveFoodStatus(row, "accepted");
+    if (row.status === "accepted") moveFoodStatus(row, "preparing");
+    return { ticket: toFoodTicket(row), note: "Tayyorlanmoqda." };
+  }
+  if (row.status === "preparing") moveFoodStatus(row, "ready");
+  if (row.handoff === "pickup") return { ticket: toFoodTicket(row), note: "Mijoz o'zi olib ketadi." };
+  if (row.status !== "ready") fail("Avval buyurtmani tayyor deb belgilang.");
+  const owner = users.find((item) => item.role === "sender" && samePhone(item.phone, place.phone));
+  if (!owner) return { ticket: toFoodTicket(row), note: "Tayyor. Kuryer uchun shu telefon buyurtmachi hisobida bo'lsin." };
+  const sent = await sendKitchenToCourier(owner.id, row.id);
+  return { ticket: sent, note: "Kuryerga yuborildi." };
 }
 
 export async function saveFoodCart(
@@ -4199,6 +4262,7 @@ export type StoreSnapshot = {
   builderSeq?: number;
   masterSubs?: MasterSubRecord[];
   foodTickets?: FoodTicketRecord[];
+  kitchenLinks?: { phone: string; chatId: number }[];
   foodSeq?: number;
   foodOpen?: { placeId: string; accepting: boolean }[];
   foodOwners?: FoodOwner[];
@@ -4241,6 +4305,7 @@ export function exportSnapshot(): StoreSnapshot {
     builderSeq,
     masterSubs: masterSubs.slice(),
     foodTickets: foodTickets.slice(),
+    kitchenLinks: kitchenLinks.slice(),
     foodSeq,
     foodOpen: foodOpen.slice(),
     foodOwners: foodOwners.slice(),
@@ -4299,6 +4364,7 @@ export function importSnapshot(raw: unknown): boolean {
   if (typeof snap.builderSeq === "number") builderSeq = snap.builderSeq;
   if (Array.isArray(snap.masterSubs)) refill(masterSubs, snap.masterSubs);
   if (Array.isArray(snap.foodTickets)) refill(foodTickets, snap.foodTickets);
+  if (Array.isArray(snap.kitchenLinks)) refill(kitchenLinks, snap.kitchenLinks);
   if (typeof snap.foodSeq === "number") foodSeq = snap.foodSeq;
   if (Array.isArray(snap.foodOpen)) refill(foodOpen, snap.foodOpen);
   if (Array.isArray(snap.foodOwners)) refill(foodOwners, snap.foodOwners);
