@@ -27,3 +27,26 @@ export async function saveFoodProfile(profile: FoodProfile): Promise<void> {
 export async function clearFoodProfile(): Promise<void> {
   await AsyncStorage.removeItem(KEY);
 }
+
+const CART_KEY = "expressgo.v1.food-cart";
+
+export type FoodCartSnap = {
+  restaurantId: string;
+  items: Record<string, number>;
+};
+
+export async function readFoodCart(): Promise<FoodCartSnap> {
+  try {
+    const raw = await AsyncStorage.getItem(CART_KEY);
+    if (!raw) return { restaurantId: "", items: {} };
+    const parsed = JSON.parse(raw) as FoodCartSnap;
+    if (!parsed || typeof parsed.restaurantId !== "string" || !parsed.items) return { restaurantId: "", items: {} };
+    return parsed;
+  } catch {
+    return { restaurantId: "", items: {} };
+  }
+}
+
+export async function saveFoodCartSnap(cart: FoodCartSnap): Promise<void> {
+  await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
+}

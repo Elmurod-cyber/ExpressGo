@@ -257,7 +257,10 @@ export async function describePoint(point: MapPoint): Promise<string> {
 }
 
 function placePart(value?: string | null): string {
-  return (value ?? "").replace(/\s+/g, " ").trim();
+  const text = (value ?? "").replace(/\s+/g, " ").trim();
+  if (!text || /^[+-]?\d+(\.\d+)?$/.test(text)) return "";
+  if (/^[23456789CFGHJMPQRVWX]{4,}\+/i.test(text)) return "";
+  return text;
 }
 
 function shortAddress(street?: string | null, area?: string | null): string {
@@ -285,31 +288,37 @@ async function nominatimShort(point: MapPoint): Promise<string> {
   return shortAddress(street, area);
 }
 
+function namedAddress(district: string, street: string): string {
+  if (district && street && foldName(district) !== foldName(street)) return `${district}, ${street}`;
+  return district || street;
+}
+
 async function deviceShort(point: MapPoint): Promise<string> {
   const rows = await Location.reverseGeocodeAsync({
     latitude: point.lat,
     longitude: point.lng,
   });
   const row = rows[0];
-  const district = placePart(row?.district);
-  const city = placePart(row?.city);
-  const region = placePart(row?.region);
-  const area = district && foldName(district) !== foldName(city) && foldName(district) !== foldName(region) ? district : "";
-  return shortAddress(row?.street, area);
+  if (!row) return "";
+  const street = [placePart(row.street) || placePart(row.name), placePart(row.streetNumber)].filter(Boolean).join(" ");
+  const district = placePart(row.district) || placePart(row.subregion) || placePart(row.city);
+  const label = namedAddress(district, street);
+  if (label) return label;
+  return placePart(row.formattedAddress);
 }
 
 async function describePointLabel(point: MapPoint): Promise<string> {
+  try {
+    const label = await deviceShort(point);
+    if (label) return label;
+  } catch {
+    // Webda yoki ruxsatsiz teskari geokod yo'q.
+  }
   try {
     const label = await nominatimShort(point);
     if (label) return label;
   } catch {
     // Tarmoq yoki CORS.
-  }
-  try {
-    const label = await deviceShort(point);
-    if (label) return label;
-  } catch {
-    // Webda teskari geokod yo'q.
   }
   return `Tanlangan nuqta (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
 }

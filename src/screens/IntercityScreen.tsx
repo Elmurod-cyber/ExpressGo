@@ -83,7 +83,6 @@ export function IntercityScreen({
           <Text className="ml-1 text-sm font-semibold text-brand">{t("trip.back")}</Text>
         </Pressable>
         <Text className="text-2xl font-bold text-ink">{t("welcome.trip")}</Text>
-        <Text className="mt-1 text-sm text-muted">{t("welcome.trip_body")}</Text>
 
         {side === "pick" && !signing ? (
           <View className="mt-5">
@@ -224,9 +223,8 @@ function TripSignUp({ onDone }: { onDone: (profile: TripProfile) => void }) {
   return (
     <PhoneCodeBox
       kind="rider"
-      title={t("trip.rider")}
-      hint={t("trip.sms_hint")}
-      onVerified={async (pass) => {
+        title={t("trip.rider")}
+        onVerified={async (pass) => {
         const account = await api.registerTripAccount("rider", pass.name, pass.phone, pass.token);
         const profile = { id: account.id, name: account.name, phone: formatUzPhone(account.phone), token: pass.token };
         await saveTripProfile("rider", profile);

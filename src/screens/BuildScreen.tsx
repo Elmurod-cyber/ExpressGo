@@ -209,7 +209,6 @@ function BuildSignUp({
     <PhoneCodeBox
       kind="employer"
       title={title}
-      hint={t("build.sms_hint")}
       tone="orange"
       onVerified={async (pass) => {
         await onSave({ name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token });
@@ -315,7 +314,9 @@ function AdForm({
   const [street, setStreet] = useState(draft && draft.address && draft.address !== joinedPlace ? draft.address : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tradeOpen, setTradeOpen] = useState(false);
   const chosen = trade === "other" ? custom.trim() : trade;
+  const tradeName = trade === "other" ? custom.trim() || t("build.other") : trade ? t(`build.t.${trade}`) : "";
 
   async function submit() {
     if (chosen.length < 2) {
@@ -365,27 +366,70 @@ function AdForm({
         <Text className="rounded-2xl border border-line bg-[#F8FAFC] px-3 py-2.5 text-base text-ink">{phone}</Text>
       </View>
       <Text className="mb-1 mt-3 text-sm font-medium text-ink">{t("build.trade")}</Text>
-      <View className="flex-row flex-wrap">
-        {TRADES.map((item) => (
-          <Chip key={item} label={t(`build.t.${item}`)} on={trade === item} onPress={() => setTrade(item)} />
-        ))}
-        <Chip label={t("build.other")} on={trade === "other"} onPress={() => setTrade("other")} />
-      </View>
+      <Pressable
+        onPress={() => setTradeOpen((value) => !value)}
+        accessibilityRole="button"
+        className="flex-row items-center rounded-2xl border border-line bg-white px-3 py-3"
+      >
+        <Text className={`flex-1 text-base ${tradeName ? "text-ink" : "text-[#98A2B3]"}`}>{tradeName || t("build.trade_ph")}</Text>
+        <Ionicons name={tradeOpen ? "chevron-up" : "chevron-down"} size={18} color="#667085" />
+      </Pressable>
+      {tradeOpen ? (
+        <View className="mt-2 overflow-hidden rounded-2xl border border-line bg-white">
+          {TRADES.map((item) => (
+            <Pressable
+              key={item}
+              onPress={() => {
+                setTrade(item);
+                setTradeOpen(false);
+              }}
+              accessibilityRole="button"
+              className="border-b border-line px-3 py-3"
+            >
+              <Text className={`text-base ${trade === item ? "font-bold text-[#C2410C]" : "text-ink"}`}>{t(`build.t.${item}`)}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => {
+              setTrade("other");
+              setTradeOpen(false);
+            }}
+            accessibilityRole="button"
+            className="px-3 py-3"
+          >
+            <Text className={`text-base ${trade === "other" ? "font-bold text-[#C2410C]" : "text-ink"}`}>{t("build.other")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {trade === "other" ? <Field label={t("build.other")} value={custom} onChange={setCustom} placeholder={t("build.trade_ph")} /> : null}
+      {kind === "job" ? (
+        <View className="mt-2">
+          <Text className="mb-1 text-sm font-medium text-ink">{t("build.about")}</Text>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder={t("build.about_job")}
+            placeholderTextColor="#98A2B3"
+            multiline
+            className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+          />
+        </View>
+      ) : null}
       {kind === "offer" ? <Field label={t("build.experience")} value={experience} onChange={setExperience} placeholder={t("build.experience_ph")} /> : null}
       <AreaPick region={region} area={area} onChange={(nextRegion, nextArea) => { setRegion(nextRegion); setArea(nextArea); }} />
-      {kind === "job" ? <Field label={t("build.street")} value={street} onChange={setStreet} placeholder={t("build.street_ph")} /> : null}
-      <View className="mt-2">
-        <Text className="mb-1 text-sm font-medium text-ink">{t("build.about")}</Text>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder={kind === "offer" ? t("build.about_offer") : t("build.about_job")}
-          placeholderTextColor="#98A2B3"
-          multiline
-          className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
-        />
-      </View>
+      {kind === "job" ? <Field label={t("build.street")} value={street} onChange={setStreet} placeholder={t("build.street_ph")} /> : (
+        <View className="mt-2">
+          <Text className="mb-1 text-sm font-medium text-ink">{t("build.about")}</Text>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder={t("build.about_offer")}
+            placeholderTextColor="#98A2B3"
+            multiline
+            className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+          />
+        </View>
+      )}
       {kind === "job" ? (
         <>
           <Text className="mb-1 mt-3 text-sm font-medium text-ink">{t("build.pay")}</Text>

@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, Image, Keyboard, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "./Screen";
+import { FoodHeader } from "./FoodHeader";
 import { PhoneCodeBox } from "./PhoneCodeBox";
 import { api } from "../services/api";
-import { clearFoodProfile, readFoodProfile, saveFoodProfile, type FoodProfile } from "../services/foodProfile";
+import {
+  clearFoodProfile,
+  readFoodCart,
+  readFoodProfile,
+  saveFoodCartSnap,
+  saveFoodProfile,
+  type FoodCartSnap,
+  type FoodProfile,
+} from "../services/foodProfile";
 import { FOOD_PLACES, type FoodDish, type FoodPlace } from "../data/foodPlaces";
 import { formatMoney } from "../services/money";
 import { formatUzPhone } from "../services/phoneMask";
@@ -16,24 +25,47 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
   const [placeId, setPlaceId] = useState<string | null>(null);
   const [customer, setCustomer] = useState<FoodProfile | null>(null);
   const [profileReady, setProfileReady] = useState(false);
+  const [cart, setCart] = useState<FoodCartSnap>({ restaurantId: "", items: {} });
+  const [openCart, setOpenCart] = useState(false);
+  const cartCount = Object.values(cart.items).reduce((sum, qty) => sum + qty, 0);
   useEffect(() => {
     let stop = false;
-    void readFoodProfile().then((row) => {
+    void Promise.all([readFoodProfile(), readFoodCart()]).then(([row, saved]) => {
       if (stop) return;
       setCustomer(row);
+      setCart(saved);
       setProfileReady(true);
     });
     return () => {
       stop = true;
     };
   }, []);
+  useEffect(() => {
+    if (!profileReady) return;
+    void saveFoodCartSnap(cart);
+    if (!customer?.token || !cart.restaurantId) return;
+    const lines = Object.entries(cart.items).map(([foodId, quantity]) => ({ foodId, quantity }));
+    void api.saveFoodCart(customer.token, cart.restaurantId, lines).catch(() => undefined);
+  }, [cart, customer, profileReady]);
+  function changeCart(restaurantId: string, dishId: string, next: number) {
+    setCart((prev) => {
+      const items = prev.restaurantId === restaurantId ? { ...prev.items } : {};
+      if (next <= 0) delete items[dishId];
+      else items[dishId] = next;
+      return { restaurantId, items };
+    });
+  }
   const place = FOOD_PLACES.find((item) => item.id === placeId) ?? null;
   if (place) {
     return (
       <PlaceMenu
         place={place}
         customer={customer}
-        profileReady={profileReady}
+        cart={place.id === cart.restaurantId ? cart.items : {}}
+        openCart={openCart}
+        onCartOpened={() => setOpenCart(false)}
+        onCartChange={(dishId, next) => changeCart(place.id, dishId, next)}
+        onCartClear={() => setCart({ restaurantId: place.id, items: {} })}
         onCustomer={setCustomer}
         onBack={() => setPlaceId(null)}
       />
@@ -43,11 +75,16 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
   return (
     <Screen compact>
       <View className="px-4 pt-2">
-        <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
-          <Ionicons name="chevron-back" size={18} color="#155EEF" />
-          <Text className="ml-1 text-sm font-semibold text-brand">{t("food.back")}</Text>
-        </Pressable>
-        <Text className="text-2xl font-bold text-ink">{t("city.tile_food")}</Text>
+        <FoodHeader
+          title={t("city.tile_food")}
+          onBack={onBack}
+          cartCount={cartCount}
+          onCart={() => {
+            if (!cart.restaurantId || cartCount === 0) return;
+            setPlaceId(cart.restaurantId);
+            setOpenCart(true);
+          }}
+        />
         {customer ? (
           <>
             <FoodMine
@@ -102,20 +139,26 @@ function PlaceMenu({
   place,
   onBack,
   customer,
-  profileReady,
+  cart,
+  openCart,
+  onCartOpened,
+  onCartChange,
+  onCartClear,
   onCustomer,
 }: {
   place: FoodPlace;
   onBack: () => void;
   customer: FoodProfile | null;
-  profileReady: boolean;
+  cart: Record<string, number>;
+  openCart: boolean;
+  onCartOpened: () => void;
+  onCartChange: (dishId: string, next: number) => void;
+  onCartClear: () => void;
   onCustomer: (next: FoodProfile | null) => void;
 }) {
   const t = useT();
   const pageScroll = useRef<ScrollView>(null);
   const dropoffFocused = useRef(false);
-  const [keyboardLift, setKeyboardLift] = useState(0);
-  const [cart, setCart] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [dropoff, setDropoff] = useState("");
   const [choice, setChoice] = useState<"pickup" | "courier" | null>(null);
@@ -124,13 +167,18 @@ function PlaceMenu({
   const [sent, setSent] = useState(false);
   const [accepting, setAccepting] = useState(true);
   const [tracked, setTracked] = useState<FoodTicket | null>(null);
-  const [mine, setMine] = useState(false);
   const digits = place.phone.replace(/\D/g, "");
   const lines = place.dishes
     .map((dish) => ({ dish, qty: cart[dish.id] ?? 0 }))
     .filter((line) => line.qty > 0);
   const count = lines.reduce((sum, line) => sum + line.qty, 0);
   const total = lines.reduce((sum, line) => sum + line.qty * line.dish.price, 0);
+
+  useEffect(() => {
+    if (!openCart) return;
+    setOpen(true);
+    onCartOpened();
+  }, [openCart, onCartOpened]);
 
   useEffect(() => {
     let stop = false;
@@ -169,13 +217,10 @@ function PlaceMenu({
   }, [open, choice]);
 
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", (event) => {
-      const windowHeight = Dimensions.get("window").height;
-      const overlap = Math.round(windowHeight - event.endCoordinates.screenY);
-      setKeyboardLift(Platform.OS === "android" && overlap > 24 ? overlap : 0);
+    const show = Keyboard.addListener("keyboardDidShow", () => {
       if (dropoffFocused.current) setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 80);
     });
-    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardLift(0));
+    const hide = Keyboard.addListener("keyboardDidHide", () => undefined);
     return () => {
       show.remove();
       hide.remove();
@@ -184,12 +229,7 @@ function PlaceMenu({
 
   function setQty(id: string, next: number) {
     setSent(false);
-    setCart((prev) => {
-      const copy = { ...prev };
-      if (next <= 0) delete copy[id];
-      else copy[id] = next;
-      return copy;
-    });
+    onCartChange(id, next);
   }
 
   async function send(handoff: "pickup" | "courier") {
@@ -201,7 +241,7 @@ function PlaceMenu({
     setError(null);
     try {
       if (!customer) {
-        setError(t("food.sms_hint"));
+        setOpen(true);
         return;
       }
       const ticket = await api.placeFoodOrder({
@@ -217,7 +257,7 @@ function PlaceMenu({
         guestToken: customer.token,
       });
       setTracked(ticket);
-      setCart({});
+      onCartClear();
       setError(null);
       setSent(true);
       setOpen(false);
@@ -235,32 +275,9 @@ function PlaceMenu({
   }
 
   return (
-    <Screen
-      compact
-      scrollRef={pageScroll}
-      keyboardInsets
-      footer={
-        <View className="bg-canvas px-4 pb-4" style={{ marginBottom: keyboardLift }}>
-          <Pressable
-            onPress={() => setOpen((value) => !value)}
-            accessibilityRole="button"
-            className="flex-row items-center rounded-full bg-[#121212] px-4 py-3.5 active:opacity-90"
-          >
-            <View className="h-8 w-8 items-center justify-center rounded-full bg-white/15">
-              <Ionicons name="bag-handle" size={16} color="#FFFFFF" />
-            </View>
-            <Text className="ml-3 flex-1 text-base font-bold text-white">{t("food.cart")}</Text>
-            <Text className="text-sm font-semibold text-white/80">{count > 0 ? t("food.count", { n: count }) : t("food.empty")}</Text>
-            <Text className="ml-3 text-base font-bold text-white">{formatMoney(total)}</Text>
-          </Pressable>
-        </View>
-      }
-    >
+    <Screen compact scrollRef={pageScroll} keyboardInsets>
       <View className="px-4 pt-2">
-        <Pressable onPress={onBack} accessibilityRole="button" className="mb-3 flex-row items-center self-start">
-          <Ionicons name="chevron-back" size={18} color="#155EEF" />
-          <Text className="ml-1 text-sm font-semibold text-brand">{t("food.back")}</Text>
-        </Pressable>
+        <FoodHeader title={place.name} onBack={onBack} cartCount={count} onCart={() => setOpen((value) => !value)} />
 
         <View className="overflow-hidden rounded-[28px] bg-white">
           <View>
@@ -284,53 +301,6 @@ function PlaceMenu({
             </Pressable>
           </View>
         </View>
-
-        {!profileReady ? (
-          <View className="mt-4 items-center">
-            <ActivityIndicator color="#C2410C" />
-          </View>
-        ) : customer ? (
-          <View className="mt-3 flex-row">
-            <Pressable onPress={() => setMine(true)} accessibilityRole="button" className="flex-1 items-center rounded-full bg-[#121212] py-3">
-              <Text className="text-sm font-bold text-white">{t("food.mine")}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                void clearFoodProfile().then(() => {
-                  onCustomer(null);
-                  setMine(false);
-                });
-              }}
-              accessibilityRole="button"
-              className="ml-2 items-center justify-center rounded-full bg-white px-4"
-            >
-              <Text className="text-xs font-semibold text-muted">{t("food.other_phone")}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <PhoneCodeBox
-            kind="food"
-            title={t("otp.title")}
-            hint={t("food.sms_hint")}
-            tone="orange"
-            onVerified={async (pass) => {
-              const profile = { name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token };
-              await saveFoodProfile(profile);
-              onCustomer(profile);
-            }}
-          />
-        )}
-        {mine && customer ? (
-          <FoodMine
-            token={customer.token}
-            onClose={() => setMine(false)}
-            onExpired={() => {
-              void clearFoodProfile();
-              onCustomer(null);
-              setMine(false);
-            }}
-          />
-        ) : null}
 
         {!accepting ? (
           <View className="mt-3 rounded-2xl bg-[#121212] px-4 py-3">
@@ -377,7 +347,16 @@ function PlaceMenu({
                 {customer.name} · {formatUzPhone(customer.phone)}
               </Text>
             ) : (
-              <Text className="mt-3 text-sm text-muted">{t("food.sms_hint")}</Text>
+              <PhoneCodeBox
+                kind="food"
+                title={t("otp.title")}
+                tone="orange"
+                onVerified={async (pass) => {
+                  const profile = { name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token };
+                  await saveFoodProfile(profile);
+                  onCustomer(profile);
+                }}
+              />
             )}
             <TextInput
               value={dropoff}

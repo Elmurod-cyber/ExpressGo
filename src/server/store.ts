@@ -6,6 +6,7 @@ import { roadRoute, roadTrip, routeTargetKey } from "../services/route";
 import { formatMoney } from "../services/money";
 import { t, tx } from "../i18n";
 import { accountNotify } from "./notifyBus";
+import { persistFoodCart, persistFoodOrder, persistFoodUser } from "./foodPersist";
 import type {
   Account,
   AdCard,
@@ -2339,7 +2340,37 @@ export async function placeFoodOrder(input: {
     at: Date.now(),
   };
   foodTickets.unshift(row);
+  void persistFoodOrder({
+    phone,
+    name,
+    restaurantId: placeId,
+    ticketId: row.id,
+    address: dropoff,
+    body: {
+      placeName,
+      pickup,
+      dropoff,
+      handoff,
+      lines,
+      foodTotal: row.foodTotal,
+      status: row.status,
+    },
+  }).catch(() => undefined);
+  void persistFoodCart(phone, name, placeId, []).catch(() => undefined);
   return toFoodTicket(row);
+}
+
+export async function saveFoodCart(
+  guestToken: string,
+  restaurantId: string,
+  lines: { foodId: string; quantity: number }[],
+): Promise<void> {
+  const session = requireGuest(guestToken, "food");
+  const clean = lines
+    .map((line) => ({ foodId: String(line.foodId ?? "").trim(), quantity: Math.round(Number(line.quantity)) }))
+    .filter((line) => line.foodId.length > 0 && line.quantity > 0)
+    .slice(0, 40);
+  await persistFoodCart(session.phone, session.name, restaurantId.trim(), clean);
 }
 
 export function listKitchen(userId: string): KitchenDesk[] {
@@ -3640,6 +3671,7 @@ export async function verifyGuestCode(kind: string, phone: string, code: string,
   const token = randomHex(32);
   const until = Date.now() + GUEST_SESSION_MS;
   guestSessions.push({ tokenHash: sha256(token), kind: role, phone: key, name: clean, until });
+  if (role === "food") void persistFoodUser(key, clean).catch(() => undefined);
   return { token, phone: key, name: clean, until };
 }
 

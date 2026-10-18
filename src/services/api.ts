@@ -473,6 +473,9 @@ export const api = {
   rateBuilder(id: string, phone: string, stars: number): Promise<BuilderCard> {
     return invoke("rateBuilder", [id, phone, stars], () => server.rateBuilder(id, phone, stars));
   },
+  saveFoodCart(guestToken: string, restaurantId: string, lines: { foodId: string; quantity: number }[]): Promise<void> {
+    return invoke("saveFoodCart", [guestToken, restaurantId, lines], () => server.saveFoodCart(guestToken, restaurantId, lines));
+  },
   placeFoodOrder(input: {
     placeId: string;
     placeName: string;

@@ -14,7 +14,7 @@ export function PhoneCodeBox({
 }: {
   kind: "rider" | "employer" | "food";
   title: string;
-  hint: string;
+  hint?: string;
   tone?: "brand" | "orange";
   onVerified: (pass: GuestPass) => Promise<void>;
 }) {
@@ -30,7 +30,7 @@ export function PhoneCodeBox({
 
   async function send() {
     if (name.trim().length < 2 || phone.replace(/\D/g, "").length < 12) {
-      setError(hint);
+      setError(hint || t("fail.generic"));
       return;
     }
     setBusy(true);
@@ -62,7 +62,7 @@ export function PhoneCodeBox({
   return (
     <View className="mt-4">
       <Text className="text-base font-bold text-ink">{title}</Text>
-      <Text className="mt-1 text-sm text-muted">{hint}</Text>
+      {hint ? <Text className="mt-1 text-sm text-muted">{hint}</Text> : null}
       <Text className="mb-1.5 mt-3 text-sm font-medium text-ink">{t("auth.name")}</Text>
       <TextInput
         value={name}

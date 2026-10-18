@@ -110,6 +110,8 @@ export const RPC = {
   startMasterSub: (phone: string) => store.startMasterSub(phone),
   rateBuilder: (id: string, phone: string, stars: number) => store.rateBuilder(id, phone, stars),
   placeFoodOrder: (input: Parameters<typeof store.placeFoodOrder>[0]) => store.placeFoodOrder(input),
+  saveFoodCart: (guestToken: string, restaurantId: string, lines: { foodId: string; quantity: number }[]) =>
+    store.saveFoodCart(guestToken, restaurantId, lines),
   listKitchen: (_userId: string) => store.listKitchen(me()),
   sendKitchenToCourier: (_userId: string, ticketId: string) => store.sendKitchenToCourier(me(), ticketId),
   foodPlaceOpen: (placeId: string) => store.foodPlaceOpen(placeId),
@@ -164,6 +166,7 @@ export const PUBLIC_RPC = new Set<RpcName>([
   "startMasterSub",
   "rateBuilder",
   "placeFoodOrder",
+  "saveFoodCart",
   "listMyFood",
   "updateMyFood",
   "cancelMyFood",
