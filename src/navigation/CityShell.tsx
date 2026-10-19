@@ -31,7 +31,7 @@ export function CityShell() {
       <View className="flex-1">
         {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} onProfile={() => go("profile")} /> : null}
         {tab === "orders" ? <AccountOrders /> : null}
-        {tab === "profile" ? <AccountProfile /> : null}
+        {tab === "profile" ? <AccountProfile onCancel={() => setTab("home")} /> : null}
       </View>
       {account && chrome ? <CityTabBar tab={tab} onChange={go} /> : null}
     </View>
@@ -73,29 +73,9 @@ function AccountOrders() {
   return <SenderApp focus="orders" showTabBar={false} />;
 }
 
-function AccountProfile() {
+function AccountProfile({ onCancel }: { onCancel: () => void }) {
   const { account } = useSession();
-  const t = useT();
-  const [signing, setSigning] = useState(false);
-  if (!account) {
-    if (!signing) {
-      return (
-        <Screen compact surface="bg-[#171717]">
-          <View className="px-5 pt-6">
-            <Text className="text-xl font-bold text-white">{t("nav.need_account")}</Text>
-            <Pressable
-              onPress={() => setSigning(true)}
-              accessibilityRole="button"
-              className="mt-6 items-center rounded-2xl bg-[#FF8A00] py-4 active:opacity-90"
-            >
-              <Text className="text-base font-bold text-[#171717]">{t("welcome.sender")}</Text>
-            </Pressable>
-          </View>
-        </Screen>
-      );
-    }
-    return <RegisterScreen role="sender" onBack={() => setSigning(false)} />;
-  }
+  if (!account) return <RegisterScreen role="sender" onBack={onCancel} />;
   return (
     <Screen compact>
       <View className="px-4 pb-6 pt-3">
