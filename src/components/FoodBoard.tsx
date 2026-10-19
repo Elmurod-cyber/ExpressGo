@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Keyboard, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "./Screen";
+import { keyboardFrameTop } from "../services/keyboardInset";
 import { FoodHeader } from "./FoodHeader";
 import { api } from "../services/api";
 import { readFoodCart, saveFoodCartSnap, type FoodCartSnap, type FoodProfile } from "../services/foodProfile";
@@ -192,12 +193,40 @@ function PlaceMenu({
     return () => clearTimeout(id);
   }, [open, choice]);
 
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => {
-      if (dropoffFocused.current) setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 80);
+  const scrollY = useRef(0);
+  const handoffRef = useRef<View>(null);
+  const frameTop = useRef(0);
+  const revealHandoff = useRef<(top: number) => void>(() => undefined);
+  revealHandoff.current = (top: number) => {
+    const node = handoffRef.current;
+    const scroll = pageScroll.current;
+    if (!node || !scroll || top <= 0) return;
+    node.measureInWindow((_x, y, _width, height) => {
+      const limit = top - 20;
+      const bottom = y + height;
+      if (bottom <= limit) return;
+      scroll.scrollTo({ y: Math.max(0, scrollY.current + bottom - limit), animated: true });
     });
-    const hide = Keyboard.addListener("keyboardDidHide", () => undefined);
+  };
+
+  useEffect(() => {
+    let first: ReturnType<typeof setTimeout> | undefined;
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      frameTop.current = keyboardFrameTop(event);
+      if (!dropoffFocused.current) return;
+      const run = () => revealHandoff.current(frameTop.current);
+      clearTimeout(first);
+      clearTimeout(again);
+      first = setTimeout(run, 220);
+      again = setTimeout(run, 640);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      frameTop.current = 0;
+    });
     return () => {
+      clearTimeout(first);
+      clearTimeout(again);
       show.remove();
       hide.remove();
     };
@@ -249,7 +278,7 @@ function PlaceMenu({
   }
 
   return (
-    <Screen compact scrollRef={pageScroll} keyboardInsets>
+    <Screen compact scrollRef={pageScroll} onScrollOffset={(y) => { scrollY.current = y; }}>
       <View className="px-4 pt-2">
         <FoodHeader title={place.name} onBack={onBack} cartCount={count} onCart={() => setOpen((value) => !value)} />
 
@@ -328,7 +357,7 @@ function PlaceMenu({
               onChangeText={setDropoff}
               onFocus={() => {
                 dropoffFocused.current = true;
-                setTimeout(() => pageScroll.current?.scrollToEnd({ animated: true }), 120);
+                setTimeout(() => revealHandoff.current(frameTop.current), 180);
               }}
               onBlur={() => {
                 dropoffFocused.current = false;
@@ -339,6 +368,7 @@ function PlaceMenu({
             />
             {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
             {!accepting ? <Text className="mt-2 text-sm font-semibold text-[#C2410C]">{t("food.closed_customer")}</Text> : null}
+            <View ref={handoffRef} collapsable={false}>
             <View className="mt-3 flex-row">
               <Pressable
                 onPress={() => {
@@ -375,6 +405,8 @@ function PlaceMenu({
                   {t("food.courier_go")}
                 </Text>
               </Pressable>
+            </View>
+            <View className="h-4" />
             </View>
             {choice ? (
               <View className="mt-3 rounded-2xl bg-card px-3 py-3">

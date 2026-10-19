@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Image, Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useSession, useT } from "../context/Session";
@@ -7,6 +7,7 @@ import { ThemeSwitch } from "./ThemeSwitch";
 import { AdminEntry } from "./DemoDock";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
+import { keyboardFrameTop, liftAboveKeyboard, useKeyboardOverlap } from "../services/keyboardInset";
 import { useNight } from "../services/theme";
 import type { OtpChallenge } from "../types";
 
@@ -232,6 +233,26 @@ function EditProfile({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const phoneChanged = draftPhone.replace(/\D/g, "") !== phone.replace(/\D/g, "");
+  const overlap = useKeyboardOverlap();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  useEffect(() => {
+    let first: ReturnType<typeof setTimeout> | undefined;
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      const top = keyboardFrameTop(event);
+      const run = () => liftAboveKeyboard(scrollRef.current, scrollY.current, top, 140);
+      clearTimeout(first);
+      clearTimeout(again);
+      first = setTimeout(run, 80);
+      again = setTimeout(run, 320);
+    });
+    return () => {
+      clearTimeout(first);
+      clearTimeout(again);
+      show.remove();
+    };
+  }, []);
 
   async function save() {
     if (!account || busy) return;
@@ -266,6 +287,17 @@ function EditProfile({
   }
 
   return (
+    <ScrollView
+      ref={scrollRef}
+      className="min-h-0 flex-1"
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      onScroll={(event) => {
+        scrollY.current = event.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: overlap }}
+    >
     <View className="min-h-0 flex-1">
       <View className="mb-4 flex-row items-center">
         <Pressable onPress={onCancel} accessibilityRole="button" accessibilityLabel={t("profile.back")} className="h-10 w-10 items-center justify-center">
@@ -313,7 +345,7 @@ function EditProfile({
         </View>
       ) : null}
       {error ? <Text className="mt-2 text-xs text-red-600">{error}</Text> : null}
-      <View className="mt-auto pt-6">
+      <View className={overlap > 0 ? "mt-6" : "mt-auto pt-6"}>
         <Pressable
           onPress={() => void (challenge ? confirm() : save())}
           disabled={busy || (challenge ? code.length < 4 : false)}
@@ -338,6 +370,7 @@ function EditProfile({
         </Pressable>
       </View>
     </View>
+    </ScrollView>
   );
 }
 
