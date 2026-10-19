@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { Screen } from "../components/Screen";
 import { LanguageSwitch } from "../components/LanguageSwitch";
+import { ThemeSwitch } from "../components/ThemeSwitch";
+import { useNight } from "../services/theme";
 import { BrandMark } from "../components/BrandMark";
 import { statusLabel } from "../components/orderStatus";
 import { useSession, useT } from "../context/Session";
@@ -25,6 +27,7 @@ type Feed = "all" | "jobs" | "food" | "trips" | "barber" | "builder";
 
 export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: boolean) => void; onProfile?: () => void }) {
   const t = useT();
+  const night = useNight();
   const { account } = useSession();
   const area = useArea();
   const [gate, setGate] = useState<Gate | null>(null);
@@ -139,13 +142,13 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
   }
 
   return (
-    <Screen compact surface="bg-[#171717]">
-      <StatusBar style="light" />
+    <Screen compact>
+      <StatusBar style={night ? "light" : "dark"} />
       <View className="px-5 pb-6 pt-1">
         <View className="flex-row items-center">
           <BrandMark size={52} />
           <View className="ml-2.5 min-w-0 flex-1">
-            <Text className="text-xl font-bold text-white" numberOfLines={1}>
+            <Text className="text-xl font-bold text-ink" numberOfLines={1}>
               Express Go
             </Text>
             <Text className="text-xs font-semibold text-[#FF8A00]" numberOfLines={2}>
@@ -153,7 +156,10 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
             </Text>
           </View>
           <View className="self-start">
-            <LanguageSwitch light compact />
+            <ThemeSwitch compact />
+            <View className="mt-1">
+              <LanguageSwitch light={night} compact />
+            </View>
           </View>
           <Pressable
             onPress={onProfile}
@@ -161,16 +167,16 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
             accessibilityLabel={t("nav.profile")}
             className="ml-2 h-10 w-10 items-center justify-center"
           >
-            <Ionicons name="person-circle-outline" size={28} color="#FFFFFF" />
+            <Ionicons name="person-circle-outline" size={28} color={night ? "#F4F6FB" : "#101828"} />
           </Pressable>
         </View>
         <Pressable onPress={area.openPicker} accessibilityRole="button" className="mt-3 flex-row items-center self-start">
           <Ionicons name="location" size={16} color="#FF8A00" />
-          <Text className="ml-1.5 text-sm font-semibold text-white">
+          <Text className="ml-1.5 text-sm font-semibold text-ink">
             {area.place ? t("area.here", { name: area.place.name, region: area.place.region }) : t("area.pick")}
           </Text>
         </Pressable>
-        {!area.place ? <Text className="mt-1 text-xs leading-4 text-[#A3A3A3]">{area.denied ? t("area.denied") : t("area.need")}</Text> : null}
+        {!area.place ? <Text className="mt-1 text-xs leading-4 text-muted">{area.denied ? t("area.denied") : t("area.need")}</Text> : null}
 
         <View
           className="mt-3.5"
@@ -208,7 +214,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
         ) : feed === "all" ? (
           <>
             <View className="mt-5 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-white">{t("trip.live")}</Text>
+              <Text className="text-lg font-bold text-ink">{t("trip.live")}</Text>
               <Text className="text-sm font-semibold text-[#FF8A00]">{t("home.see_all")} →</Text>
             </View>
             {booting && city.length === 0 ? (
@@ -216,10 +222,10 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
                 <ActivityIndicator color="#FF8A00" />
               </View>
             ) : city.length === 0 ? (
-              <View className="mt-3 items-center rounded-3xl bg-[#242424] px-5 py-8">
+              <View className="mt-3 items-center rounded-3xl bg-card px-5 py-8">
                 <Ionicons name="megaphone-outline" size={28} color="#FF8A00" />
-                <Text className="mt-3 text-center text-base font-semibold text-white">{t("city.all_empty")}</Text>
-                <Text className="mt-1 text-center text-sm leading-5 text-[#A3A3A3]">{t("city.all_hint")}</Text>
+                <Text className="mt-3 text-center text-base font-semibold text-ink">{t("city.all_empty")}</Text>
+                <Text className="mt-1 text-center text-sm leading-5 text-muted">{t("city.all_hint")}</Text>
               </View>
             ) : (
               city.map((card) =>
@@ -270,7 +276,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
             >
               <Text className="text-base font-bold text-white">{t("city.barber_book")}</Text>
             </Pressable>
-            <View className="mt-3 rounded-3xl bg-white px-5 py-6">
+            <View className="mt-3 rounded-3xl bg-card px-5 py-6">
               <Text className="text-base font-semibold text-ink">{barberAsk ? t("city.food_empty") : t("city.barber_empty")}</Text>
               {barberAsk ? null : <Text className="mt-2 text-sm text-muted">{t("city.barber_hint")}</Text>}
             </View>
@@ -289,7 +295,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
               <Text className="text-base font-bold text-white">{t("city.rider")}</Text>
             </Pressable>
             {trips.length === 0 ? (
-              <View className="mt-3 rounded-3xl bg-white px-5 py-6">
+              <View className="mt-3 rounded-3xl bg-card px-5 py-6">
                 <Text className="text-base font-semibold text-ink">{t("city.trips_empty")}</Text>
               </View>
             ) : (
@@ -298,7 +304,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
                   key={trip.id}
                   onPress={() => openDetail({ kind: "trip", id: trip.id })}
                   accessibilityRole="button"
-                  className="mt-3 rounded-3xl bg-[#FFF1E6] px-4 py-2.5 active:opacity-90"
+                  className="mt-3 rounded-3xl bg-card px-4 py-2.5 active:opacity-90"
                 >
                   <Text className="text-base font-semibold text-ink">
                     {trip.from} → {trip.to}
@@ -324,16 +330,16 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
 function JobSheet({ job, onClose }: { job: LiveJob; onClose: () => void }) {
   const t = useT();
   return (
-    <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
+    <View className="mt-5 rounded-3xl bg-card px-4 py-3">
       <View className="flex-row items-center justify-between">
         <Text className="text-xs font-semibold text-[#FF8A00]">
           {t("city.tile_delivery")} · {statusLabel[job.status]}
         </Text>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("close")}>
-          <Text className="text-sm font-semibold text-[#A3A3A3]">{t("close")}</Text>
+          <Text className="text-sm font-semibold text-muted">{t("close")}</Text>
         </Pressable>
       </View>
-      <Text className="mt-3 text-xl font-bold text-white">{job.item}</Text>
+      <Text className="mt-3 text-xl font-bold text-ink">{job.item}</Text>
       <DetailLine label={t("sheet.pickup")} value={job.pickup} />
       <DetailLine label={t("sheet.drop")} value={job.dropoff} />
       <DetailLine label={t("auth.vehicle")} value={VEHICLE_LABEL[job.vehicle]} />
@@ -345,15 +351,15 @@ function JobSheet({ job, onClose }: { job: LiveJob; onClose: () => void }) {
 function TripSheet({ trip, onClose }: { trip: TripCard; onClose: () => void }) {
   const t = useT();
   return (
-    <View className="mt-5 rounded-3xl bg-[#262626] px-4 py-3">
+    <View className="mt-5 rounded-3xl bg-card px-4 py-3">
       <View className="flex-row items-center justify-between">
         <Text className="text-xs font-semibold text-[#FF8A00]">{trip.offer === "driver" ? t("trip.driver") : t("trip.rider")}</Text>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t("close")}>
-          <Text className="text-sm font-semibold text-[#A3A3A3]">{t("close")}</Text>
+          <Text className="text-sm font-semibold text-muted">{t("close")}</Text>
         </Pressable>
       </View>
       {trip.photo ? <Image source={{ uri: trip.photo }} style={{ width: 72, height: 72, borderRadius: 36, marginTop: 12 }} /> : null}
-      <Text className="mt-3 text-xl font-bold text-white">
+      <Text className="mt-3 text-xl font-bold text-ink">
         {trip.from} → {trip.to}
       </Text>
       {trip.vehicle ? <DetailLine label={t("trip.vehicle")} value={trip.vehicle} /> : null}
@@ -362,7 +368,7 @@ function TripSheet({ trip, onClose }: { trip: TripCard; onClose: () => void }) {
         {t("trip.seats")}: {trip.seats}
       </Text>
       <Text className="mt-3 text-base font-semibold text-brand">{trip.phoneMasked}</Text>
-      {trip.note ? <Text className="mt-2 text-sm text-[#A3A3A3]">{trip.note}</Text> : null}
+      {trip.note ? <Text className="mt-2 text-sm text-muted">{trip.note}</Text> : null}
       <Text className="mt-3 self-end text-[21px] font-extrabold text-[#FF8A00]">{trip.price > 0 ? formatMoney(trip.price) : t("trip.deal")}</Text>
     </View>
   );
@@ -371,8 +377,8 @@ function TripSheet({ trip, onClose }: { trip: TripCard; onClose: () => void }) {
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <View className="mt-3">
-      <Text className="text-xs font-semibold text-[#A3A3A3]">{label}</Text>
-      <Text className="mt-0.5 text-base font-semibold text-white">{value}</Text>
+      <Text className="text-xs font-semibold text-muted">{label}</Text>
+      <Text className="mt-0.5 text-base font-semibold text-ink">{value}</Text>
     </View>
   );
 }
@@ -420,32 +426,32 @@ function HomeAd({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      className="mt-2.5 flex-row items-center rounded-[18px] bg-[#242424] p-2.5 active:opacity-90"
+      className="mt-2.5 flex-row items-center rounded-[18px] bg-card p-2.5 active:opacity-90"
     >
       <Image source={portrait ? { uri: portrait } : art} style={{ width: 62, height: 62, borderRadius: portrait ? 31 : 14 }} resizeMode="cover" />
       <View className="ml-3 min-w-0 flex-1">
         <Text className="text-xs font-semibold text-[#FF8A00]" numberOfLines={1}>
           {kicker}
         </Text>
-        <Text className="mt-0.5 text-[15px] font-bold text-white" numberOfLines={1}>
+        <Text className="mt-0.5 text-[15px] font-bold text-ink" numberOfLines={1}>
           {title}
         </Text>
         {body ? (
-          <Text className="mt-0.5 text-xs leading-4 text-[#A3A3A3]" numberOfLines={2}>
+          <Text className="mt-0.5 text-xs leading-4 text-muted" numberOfLines={2}>
             {body}
           </Text>
         ) : null}
         {place ? (
           <View className="mt-1 flex-row items-center">
             <Ionicons name="location" size={12} color="#FF8A00" />
-            <Text className="ml-1 flex-1 text-xs text-[#D0D0D0]" numberOfLines={1}>
+            <Text className="ml-1 flex-1 text-xs text-muted" numberOfLines={1}>
               {place}
             </Text>
           </View>
         ) : null}
       </View>
       <View className="ml-2 items-end">
-        {money ? <Text className="text-sm font-bold text-white">{money}</Text> : null}
+        {money ? <Text className="text-sm font-bold text-ink">{money}</Text> : null}
         <Ionicons name="chevron-forward" size={16} color="#8A8A8A" style={{ marginTop: 6 }} />
       </View>
     </Pressable>

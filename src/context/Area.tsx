@@ -109,7 +109,7 @@ export function AreaProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <View className="flex-1 justify-end bg-black/40">
-          <View className="max-h-[80%] rounded-t-3xl bg-white px-4 pb-8 pt-4">
+          <View className="max-h-[80%] rounded-t-3xl bg-card px-4 pb-8 pt-4">
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-ink">{t("area.pick")}</Text>
               <Pressable onPress={() => setPickerOpen(false)} accessibilityRole="button" className="p-1">

@@ -18,7 +18,7 @@ export function Field({ label, value, onChangeText, placeholder, keyboardType = 
         placeholder={placeholder}
         placeholderTextColor="#98A2B3"
         keyboardType={keyboardType}
-        className="rounded-2xl bg-white px-4 py-3.5 text-base text-ink"
+        className="rounded-2xl bg-card px-4 py-3.5 text-base text-ink"
       />
     </View>
   );

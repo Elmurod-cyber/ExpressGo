@@ -110,7 +110,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
               {challenge.testCode ? t("otp.test_hint", { code: challenge.testCode }) : t("otp.body", { phone: challenge.phone })}
             </Text>
           </View>
-          <View className="mt-6 rounded-[28px] bg-white px-5 py-6">
+          <View className="mt-6 rounded-[28px] bg-card px-5 py-6">
             {typeof __DEV__ !== "undefined" && __DEV__ ? (
               <Text className="mb-4 text-sm text-muted">{t("otp.dev_hint")}</Text>
             ) : null}
@@ -163,7 +163,7 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
           </Text>
         </View>
 
-        <View className="mt-6 rounded-[28px] bg-white px-5 py-6">
+        <View className="mt-6 rounded-[28px] bg-card px-5 py-6">
           {signup ? (
             <AuthField
               label={t("auth.name")}
@@ -230,7 +230,7 @@ function AuthField({
   return (
     <View className="mb-4">
       <Text className="mb-2 text-sm font-medium text-ink">{label}</Text>
-      <View className="flex-row items-center rounded-2xl border border-line bg-white px-3">
+      <View className="flex-row items-center rounded-2xl border border-line bg-card px-3">
         <Ionicons name={icon} size={18} color="#98A2B3" />
         <TextInput
           value={value}

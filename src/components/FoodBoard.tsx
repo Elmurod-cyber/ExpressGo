@@ -85,7 +85,7 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
             key={item.id}
             onPress={() => setPlaceId(item.id)}
             accessibilityRole="button"
-            className="mt-4 overflow-hidden rounded-[28px] bg-white active:opacity-90"
+            className="mt-4 overflow-hidden rounded-[28px] bg-card active:opacity-90"
           >
             <View>
               <Image source={item.image} style={{ width: "100%", height: 180 }} resizeMode="cover" accessibilityLabel={item.name} />
@@ -252,7 +252,7 @@ function PlaceMenu({
       <View className="px-4 pt-2">
         <FoodHeader title={place.name} onBack={onBack} cartCount={count} onCart={() => setOpen((value) => !value)} />
 
-        <View className="overflow-hidden rounded-[28px] bg-white">
+        <View className="overflow-hidden rounded-[28px] bg-card">
           <View>
             <Image source={place.image} style={{ width: "100%", height: 210 }} resizeMode="cover" accessibilityLabel={place.name} />
             <View className="absolute inset-x-0 bottom-0 bg-black/45 px-4 py-3">
@@ -296,7 +296,7 @@ function PlaceMenu({
           <DishRow key={dish.id} dish={dish} qty={cart[dish.id] ?? 0} onChange={(next) => setQty(dish.id, next)} />
         ))}
         {open ? (
-          <View className="mt-4 rounded-3xl bg-white px-4 py-3">
+          <View className="mt-4 rounded-3xl bg-card px-4 py-3">
             <Text className="text-base font-bold text-ink">{t("food.cart")}</Text>
             {lines.length === 0 ? <Text className="mt-2 text-sm text-muted">{t("food.empty")}</Text> : null}
             {lines.map((line) => (
@@ -334,7 +334,7 @@ function PlaceMenu({
               }}
               placeholder={t("food.drop")}
               placeholderTextColor="#98A2B3"
-              className="mt-2 rounded-2xl border border-line bg-[#F8FAFC] px-3 py-2.5 text-base text-ink"
+              className="mt-2 rounded-2xl border border-line bg-card px-3 py-2.5 text-base text-ink"
             />
             {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
             {!accepting ? <Text className="mt-2 text-sm font-semibold text-[#C2410C]">{t("food.closed_customer")}</Text> : null}
@@ -347,7 +347,7 @@ function PlaceMenu({
                 disabled={busy || count === 0 || !accepting}
                 accessibilityRole="button"
                 accessibilityState={{ selected: choice === "pickup" }}
-                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "pickup" ? "border-[#121212] bg-[#121212]" : "border-[#D0D5DD] bg-white"}`}
+                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "pickup" ? "border-[#121212] bg-[#121212]" : "border-[#D0D5DD] bg-card"}`}
               >
                 <Text
                   numberOfLines={2}
@@ -365,7 +365,7 @@ function PlaceMenu({
                 disabled={busy || count === 0 || !accepting}
                 accessibilityRole="button"
                 accessibilityState={{ selected: choice === "courier" }}
-                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "courier" ? "border-[#FF8A00] bg-[#FF8A00]" : "border-[#D0D5DD] bg-white"}`}
+                className={`flex-1 items-center rounded-2xl border px-2 py-3 ${busy || count === 0 || !accepting ? "border-transparent bg-slate-200" : choice === "courier" ? "border-[#FF8A00] bg-[#FF8A00]" : "border-[#D0D5DD] bg-card"}`}
               >
                 <Text
                   numberOfLines={2}
@@ -376,7 +376,7 @@ function PlaceMenu({
               </Pressable>
             </View>
             {choice ? (
-              <View className="mt-3 rounded-2xl bg-[#F8FAFC] px-3 py-3">
+              <View className="mt-3 rounded-2xl bg-card px-3 py-3">
                 <Text className="text-sm leading-5 text-ink">{t("food.confirm_q")}</Text>
                 <Text className="mt-1 text-sm font-bold text-[#C2410C]">
                   {choice === "pickup" ? t("food.pickup_self") : t("food.courier_go")}
@@ -404,7 +404,7 @@ function PlaceMenu({
 function DishRow({ dish, qty, onChange }: { dish: FoodDish; qty: number; onChange: (next: number) => void }) {
   const t = useT();
   return (
-    <View className="mt-2 flex-row items-center rounded-3xl bg-white p-3">
+    <View className="mt-2 flex-row items-center rounded-3xl bg-card p-3">
       <Image source={dish.image} style={{ width: 84, height: 84, borderRadius: 20 }} resizeMode="cover" />
       <View className="ml-3 min-w-0 flex-1">
         <Text className="text-base font-bold text-ink">{t(dish.nameKey)}</Text>
@@ -504,7 +504,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
   }
 
   return (
-    <View className="mt-3 rounded-3xl bg-white px-4 py-4">
+    <View className="mt-3 rounded-3xl bg-card px-4 py-4">
       <View className="flex-row items-center">
         <Text className="flex-1 text-base font-bold text-ink">{t("food.mine")}</Text>
         {onClose ? (
@@ -557,7 +557,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
               onChangeText={setDrop}
               placeholder={t("food.drop")}
               placeholderTextColor="#98A2B3"
-              className="mt-2 rounded-2xl bg-white px-3 py-2 text-sm text-ink"
+              className="mt-2 rounded-2xl bg-card px-3 py-2 text-sm text-ink"
             />
           ) : (
             <Text className="mt-2 text-sm text-muted">{ticket.handoff === "pickup" ? t("food.pickup_self") : ticket.dropoff}</Text>
@@ -651,7 +651,7 @@ export function KitchenPanel({ userId, onSent }: { userId: string; onSent: () =>
               <Text className="px-4 py-4 text-sm text-muted">{t("food.kitchen_empty")}</Text>
             ) : (
               fresh.map((ticket) => (
-                <View key={ticket.id} className="mx-3 mb-3 mt-3 rounded-2xl bg-white px-4 py-3">
+                <View key={ticket.id} className="mx-3 mb-3 mt-3 rounded-2xl bg-card px-4 py-3">
                   {ticket.lines.map((line) => (
                     <Text key={`${ticket.id}-${line.name}`} className="text-sm font-semibold text-ink">
                       {line.qty} × {line.name}

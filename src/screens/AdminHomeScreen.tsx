@@ -331,7 +331,7 @@ export function AdminHomeScreen() {
 
         {error ? <Text className="mt-4 text-sm text-red-600">{error}</Text> : null}
 
-        <View className="mt-5 flex-row flex-wrap rounded-2xl bg-white p-1">
+        <View className="mt-5 flex-row flex-wrap rounded-2xl bg-card p-1">
           <TextTab label={t("admin.tab.jobs")} selected={tab === "jobs"} onPress={() => setTab("jobs")} />
           <TextTab label={t("admin.tab.people")} selected={tab === "users"} onPress={() => setTab("users")} />
           <TextTab label={t("admin.tab.docs")} selected={tab === "docs"} onPress={() => setTab("docs")} />
@@ -356,7 +356,7 @@ export function AdminHomeScreen() {
                 </View>
               ) : null}
               {jobs.length === 0 ? (
-                <View className="rounded-3xl bg-white px-5 py-8">
+                <View className="rounded-3xl bg-card px-5 py-8">
                   <Text className="text-base font-semibold text-ink">
                     {t("admin.empty_jobs")}
                   </Text>
@@ -372,7 +372,7 @@ export function AdminHomeScreen() {
         {tab === "users" ? (
           <View className="mt-4">
             {board.payouts.length > 0 ? (
-              <View className="mb-3 rounded-3xl bg-white p-4">
+              <View className="mb-3 rounded-3xl bg-card p-4">
                 <Text className="text-base font-bold text-ink">{t("admin.payouts")}</Text>
                 <Text className="mt-1 text-xs text-muted">
                   {t("admin.payouts_total", { money: formatMoney(board.cashoutTotal) })}
@@ -389,7 +389,7 @@ export function AdminHomeScreen() {
               </View>
             ) : null}
             {people.length === 0 ? (
-              <View className="rounded-3xl bg-white px-5 py-8">
+              <View className="rounded-3xl bg-card px-5 py-8">
                 <Text className="text-base font-semibold text-ink">{t("admin.empty_people")}</Text>
                 <Text className="mt-2 text-sm text-muted">{t("admin.empty_people_hint")}</Text>
               </View>
@@ -404,7 +404,7 @@ export function AdminHomeScreen() {
         {tab === "docs" ? (
           <View className="mt-4">
             {board.reviews.length === 0 ? (
-              <View className="rounded-3xl bg-white px-5 py-8">
+              <View className="rounded-3xl bg-card px-5 py-8">
                 <Text className="text-base font-semibold text-ink">{t("admin.docs_empty")}</Text>
                 <Text className="mt-2 text-sm text-muted">{t("admin.docs_empty_hint")}</Text>
               </View>
@@ -425,7 +425,7 @@ export function AdminHomeScreen() {
         {tab === "checks" ? (
           <View className="mt-4">
             {checks.map((check) => (
-              <View key={check.title} className="mb-3 rounded-3xl bg-white p-4">
+              <View key={check.title} className="mb-3 rounded-3xl bg-card p-4">
                 <View className="flex-row items-center">
                   <Ionicons
                     name={check.ok ? "checkmark-circle" : "alert-circle"}
@@ -460,18 +460,18 @@ export function AdminHomeScreen() {
 
         {tab === "sms" ? (
           <View className="mt-4">
-            <View className="mb-3 rounded-3xl bg-white p-4">
+            <View className="mb-3 rounded-3xl bg-card p-4">
               <Text className="text-base font-bold text-ink">{t("admin.sms_title")}</Text>
               <Text className="mt-1 text-xs leading-4 text-muted">{t("admin.sms_hint")}</Text>
             </View>
             {board.sms.length === 0 ? (
-              <View className="rounded-3xl bg-white px-5 py-8">
+              <View className="rounded-3xl bg-card px-5 py-8">
                 <Text className="text-base font-semibold text-ink">{t("admin.sms_empty")}</Text>
                 <Text className="mt-2 text-sm text-muted">{t("admin.sms_empty_hint")}</Text>
               </View>
             ) : (
               board.sms.map((item) => (
-                <View key={item.id} className="mb-3 rounded-3xl bg-white p-4">
+                <View key={item.id} className="mb-3 rounded-3xl bg-card p-4">
                   <View className="flex-row items-start justify-between">
                     <Text className="text-xs font-semibold text-brand">{t(`sms.${item.kind}`)}</Text>
                     <Text className="text-[11px] text-muted">{formatReadyAt(item.at)}</Text>
@@ -486,18 +486,18 @@ export function AdminHomeScreen() {
 
         {tab === "push" ? (
           <View className="mt-4">
-            <View className="mb-3 rounded-3xl bg-white p-4">
+            <View className="mb-3 rounded-3xl bg-card p-4">
               <Text className="text-base font-bold text-ink">{t("admin.push_title")}</Text>
               <Text className="mt-1 text-xs leading-4 text-muted">{t("admin.push_hint")}</Text>
             </View>
             {board.pushes.length === 0 ? (
-              <View className="rounded-3xl bg-white px-5 py-8">
+              <View className="rounded-3xl bg-card px-5 py-8">
                 <Text className="text-base font-semibold text-ink">{t("admin.push_empty")}</Text>
                 <Text className="mt-2 text-sm text-muted">{t("admin.push_empty_hint")}</Text>
               </View>
             ) : (
               board.pushes.map((item) => (
-                <View key={item.id} className="mb-3 rounded-3xl bg-white p-4">
+                <View key={item.id} className="mb-3 rounded-3xl bg-card p-4">
                   <View className="flex-row items-start justify-between">
                     <Text className="flex-1 pr-3 text-sm font-semibold text-ink">{item.title}</Text>
                     <Text className="text-[11px] text-muted">{formatReadyAt(item.at)}</Text>
@@ -546,7 +546,7 @@ function AdsPanel({
   const { t } = useSession();
   return (
     <View className="mt-4">
-      <View className="rounded-3xl bg-white p-4">
+      <View className="rounded-3xl bg-card p-4">
         <Text className="text-base font-bold text-ink">{t("admin.ad_buy")}</Text>
         <Text className="mt-1 text-xs leading-4 text-muted">{t("admin.ad_hint")}</Text>
         <TextInput
@@ -611,7 +611,7 @@ function AdsPanel({
         </Pressable>
       </View>
       {ads.length === 0 ? (
-        <View className="mt-3 rounded-3xl bg-white px-5 py-8">
+        <View className="mt-3 rounded-3xl bg-card px-5 py-8">
           <Text className="text-base font-semibold text-ink">{t("admin.ad_none")}</Text>
         </View>
       ) : (
@@ -632,7 +632,7 @@ function AdRow({ ad }: { ad: AdCard }) {
           { text: t("close"), style: "cancel" },
         ])
       }
-      className="mt-3 rounded-3xl bg-white p-4"
+      className="mt-3 rounded-3xl bg-card p-4"
     >
       <View className="flex-row items-start justify-between">
         <Text className="flex-1 pr-3 text-base font-bold text-ink">{ad.title}</Text>
@@ -682,7 +682,7 @@ function Segment({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      className={`flex-1 flex-row items-center justify-center rounded-2xl py-3 ${selected ? "bg-[#121212]" : "bg-white"}`}
+      className={`flex-1 flex-row items-center justify-center rounded-2xl py-3 ${selected ? "bg-[#121212]" : "bg-card"}`}
     >
       <Ionicons name={icon === "list" ? "list" : "map-outline"} size={16} color={selected ? "#FFFFFF" : "#667085"} />
       <Text className={`ml-2 text-sm font-semibold ${selected ? "text-white" : "text-muted"}`}>{label}</Text>
@@ -703,7 +703,7 @@ function Tile({
 }) {
   const color = tone === "green" ? "#12B76A" : "#101828";
   return (
-    <View className="flex-1 rounded-3xl bg-white px-4 py-5">
+    <View className="flex-1 rounded-3xl bg-card px-4 py-5">
       <Ionicons name={icon} size={22} color={color} />
       <Text className="mt-3 text-3xl font-bold text-ink">{value}</Text>
       <Text className="mt-1 text-sm text-muted">{label}</Text>
@@ -718,7 +718,7 @@ function AdminJobCard({ job, map }: { job: AdminJob; map: boolean }) {
   const statusColor = waiting ? "text-[#C47E09]" : accepted ? "text-[#155EEF]" : job.status === "delivered" ? "text-emerald-600" : "text-muted";
   const dot = waiting ? "bg-[#F5A524]" : accepted ? "bg-[#155EEF]" : job.status === "delivered" ? "bg-emerald-500" : "bg-slate-300";
   return (
-    <View className="mb-3 rounded-3xl bg-white p-4">
+    <View className="mb-3 rounded-3xl bg-card p-4">
       <View className="flex-row items-start justify-between">
         <Text className="flex-1 pr-3 text-lg font-bold text-ink">{job.item}</Text>
         <View className="flex-row items-center">
@@ -795,7 +795,7 @@ function DocReviewCard({
   const { t } = useSession();
   const pending = item.status === "pending";
   return (
-    <View className="mb-3 rounded-3xl bg-white p-4">
+    <View className="mb-3 rounded-3xl bg-card p-4">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-3">
           <Text className="text-base font-bold text-ink">{item.who}</Text>
@@ -845,7 +845,7 @@ function PersonRow({
   const courier = person.role === "courier";
   const amount = Math.round(Number(sum));
   return (
-    <View className="mb-3 rounded-3xl bg-white p-4">
+    <View className="mb-3 rounded-3xl bg-card p-4">
       <View className="flex-row items-center justify-between">
         <Text className="flex-1 pr-3 text-base font-bold text-ink">{person.name}</Text>
         <Text className="text-xs font-semibold text-muted">

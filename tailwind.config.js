@@ -2,13 +2,15 @@
 module.exports = {
   content: ["./App.tsx", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        ink: "#101828",
-        canvas: "#F4F6FB",
-        muted: "#667085",
-        line: "#E6EAF2",
+        ink: "rgb(var(--eg-ink) / <alpha-value>)",
+        canvas: "rgb(var(--eg-canvas) / <alpha-value>)",
+        muted: "rgb(var(--eg-muted) / <alpha-value>)",
+        line: "rgb(var(--eg-line) / <alpha-value>)",
+        card: "rgb(var(--eg-card) / <alpha-value>)",
         brand: {
           DEFAULT: "#155EEF",
           dark: "#1047C4",

@@ -145,7 +145,7 @@ export const MapPicker = forwardRef<MapPickerHandle, MapPickerProps>(function Ma
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View className="flex-1 bg-black/40 pt-16">
-          <View className="flex-1 rounded-t-[28px] bg-white px-4 pt-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <View className="flex-1 rounded-t-[28px] bg-card px-4 pt-4" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="flex-row items-center">
               <Text className="flex-1 pr-3 text-lg font-bold text-ink">{t("create.map_drag")}</Text>
               <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel={t("close")} className="p-1">

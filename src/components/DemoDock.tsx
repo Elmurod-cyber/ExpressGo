@@ -11,7 +11,7 @@ export function AdminEntry() {
     <Pressable
       onPress={() => setDock("admin")}
       accessibilityRole="button"
-      className="mt-3 flex-row items-center rounded-3xl bg-white px-3 py-2.5 active:opacity-90"
+      className="mt-3 flex-row items-center rounded-3xl bg-card px-3 py-2.5 active:opacity-90"
     >
       <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-soft">
         <Ionicons name="grid" size={18} color="#155EEF" />

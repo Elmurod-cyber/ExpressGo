@@ -243,7 +243,7 @@ export function CreateErrandScreen({ onDone, onBack }: CreateErrandScreenProps) 
           <Text className="text-sm font-semibold text-brand">{t("errand.back")}</Text>
         </Pressable>
 
-        <View className="mt-2 rounded-[28px] bg-white p-4">
+        <View className="mt-2 rounded-[28px] bg-card p-4">
           <Text className="text-xl font-bold text-ink">{t("errand.title")}</Text>
           <Text className="mt-1 text-sm text-muted">{t("errand.body")}</Text>
 
@@ -287,7 +287,7 @@ export function CreateErrandScreen({ onDone, onBack }: CreateErrandScreenProps) 
               accessibilityRole="button"
               className="ml-1 flex-row items-center rounded-full bg-[#12B76A] px-3 py-2"
             >
-              <View className="mr-1.5 h-2 w-2 rounded-full bg-white" />
+              <View className="mr-1.5 h-2 w-2 rounded-full bg-card" />
               <Text className="text-xs font-semibold text-white">{t("create.here")}</Text>
             </Pressable>
           </View>

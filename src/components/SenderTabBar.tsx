@@ -29,7 +29,7 @@ export function SenderTabBar({
   const insets = useSafeAreaInsets();
   const t = useT();
   return (
-    <View className="flex-row border-t border-line bg-white px-1 pt-1" style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
+    <View className="flex-row border-t border-line bg-card px-1 pt-1" style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
       {items.map((item) => {
         const selected = page === item.id;
         const color = selected ? "#1290F9" : "#98A2B3";

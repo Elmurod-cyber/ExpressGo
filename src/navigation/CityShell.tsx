@@ -27,7 +27,7 @@ export function CityShell() {
   }
 
   return (
-    <View className="flex-1 bg-[#171717]">
+    <View className="flex-1 bg-canvas">
       <View className="flex-1">
         {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} onProfile={() => go("profile")} /> : null}
         {tab === "orders" ? <AccountOrders /> : null}
@@ -45,9 +45,9 @@ function AccountOrders() {
   if (!account) {
     if (!signing) {
       return (
-        <Screen compact surface="bg-[#171717]">
+        <Screen compact>
           <View className="px-5 pt-6">
-            <Text className="text-xl font-bold text-white">{t("nav.need_account")}</Text>
+            <Text className="text-xl font-bold text-ink">{t("nav.need_account")}</Text>
             <Pressable
               onPress={() => setSigning(true)}
               accessibilityRole="button"
@@ -63,9 +63,9 @@ function AccountOrders() {
   }
   if (account.role === "courier") {
     return (
-      <Screen compact surface="bg-[#171717]">
+      <Screen compact>
         <View className="px-5 pt-8">
-          <Text className="text-base leading-6 text-white">{t("city.worker_app")}</Text>
+          <Text className="text-base leading-6 text-ink">{t("city.worker_app")}</Text>
         </View>
       </Screen>
     );

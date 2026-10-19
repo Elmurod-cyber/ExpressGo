@@ -17,7 +17,7 @@ export function InboxPanel({
   const t = useT();
   const open = notes.filter((note) => !note.read);
   return (
-    <View className="mt-4 rounded-[28px] bg-white px-5 py-5">
+    <View className="mt-4 rounded-[28px] bg-card px-5 py-5">
       <View className="flex-row items-center justify-between">
         <Text className="text-xl font-bold text-ink">{t("inbox")}</Text>
         <View className="flex-row items-center">

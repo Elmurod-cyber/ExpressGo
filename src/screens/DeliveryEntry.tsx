@@ -50,7 +50,7 @@ export function DeliveryEntry({
           <Text className="ml-2 text-base font-bold text-white">{t("sender.new_btn")}</Text>
         </Pressable>
         {jobs.length === 0 ? (
-          <View className="mt-5 rounded-3xl bg-white px-5 py-6">
+          <View className="mt-5 rounded-3xl bg-card px-5 py-6">
             <Text className="text-base font-semibold text-ink">{t("city.live_empty")}</Text>
             <Text className="mt-2 text-sm text-muted">{t("city.live_hint")}</Text>
           </View>

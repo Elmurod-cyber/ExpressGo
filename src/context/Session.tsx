@@ -181,7 +181,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   if (!ready) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
+      <View className="flex-1 items-center justify-center bg-canvas px-6">
         <BrandLogo width={180} />
         <Text className="mt-4 text-sm text-muted">{t("boot.wait")}</Text>
       </View>

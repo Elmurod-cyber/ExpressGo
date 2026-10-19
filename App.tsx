@@ -8,6 +8,8 @@ import { AreaProvider } from "./src/context/Area";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { downloadUpdateInBackground } from "./src/services/appUpdates";
 import { registerForPushNotificationsAsync } from "./src/services/push";
+import { loadTheme } from "./src/services/theme";
+import { useColorScheme } from "nativewind";
 
 function useScreenAwake() {
   useEffect(() => {
@@ -26,20 +28,23 @@ function useScreenAwake() {
 }
 
 export default function App() {
+  const { colorScheme } = useColorScheme();
+  const night = colorScheme !== "light";
   useScreenAwake();
   useEffect(() => {
+    void loadTheme();
     void downloadUpdateInBackground();
     void registerForPushNotificationsAsync();
   }, []);
 
   return (
     <SafeAreaProvider style={{ flex: 1, width: "100%" }}>
-      <StatusBar style="dark" />
+      <StatusBar style={night ? "light" : "dark"} />
       <SessionProvider>
         <AreaProvider>
           <View
-            className={Platform.OS === "web" ? "flex-1 items-center bg-[#D5DBE6]" : "w-full flex-1"}
-            style={Platform.OS === "web" ? undefined : { flex: 1, width: "100%", backgroundColor: "#171717" }}
+            className={Platform.OS === "web" ? "flex-1 items-center bg-[#D5DBE6]" : "w-full flex-1 bg-canvas"}
+            style={Platform.OS === "web" ? undefined : { flex: 1, width: "100%" }}
           >
             <View
               className={Platform.OS === "web" ? "h-full w-full max-w-md flex-1 bg-canvas" : "h-full w-full flex-1"}

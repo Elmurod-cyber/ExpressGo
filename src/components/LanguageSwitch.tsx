@@ -36,7 +36,7 @@ function LangChip({
       accessibilityLabel={code === "uz" ? "O'zbekcha" : "Русский"}
       className={`${compact ? "px-2 py-0.5" : "px-3 py-1.5"} ${selected ? (light ? "bg-white" : "bg-[#121212]") : ""}`}
     >
-      <Text className={`${compact ? "text-[10px]" : "text-xs"} font-bold ${selected ? (light ? "text-ink" : "text-white") : light ? "text-white/70" : "text-muted"}`}>
+      <Text className={`${compact ? "text-[10px]" : "text-xs"} font-bold ${selected ? (light ? "text-[#171717]" : "text-white") : light ? "text-white/70" : "text-muted"}`}>
         {label}
       </Text>
     </Pressable>

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { MapBoard } from "../components/MapBoard";
 import { Screen } from "../components/Screen";
 import { useSession } from "../context/Session";
+import { useNight } from "../services/theme";
 import { api } from "../services/api";
 import { formatMoney } from "../services/money";
 import { VEHICLE_LABEL, formatReadyAt, formatWaitSec, isJobOpen, readyHint } from "../server/rules";
@@ -134,6 +135,7 @@ export function SenderApp({
   onBack?: () => void;
 } = {}) {
   const { account, t } = useSession();
+  const night = useNight();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState<SenderPage>(focus ?? "home");
   useEffect(() => {
@@ -180,10 +182,10 @@ export function SenderApp({
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel={t("build.back")}
-          className="absolute left-3 z-30 h-10 w-10 items-center justify-center rounded-full bg-white"
+          className="absolute left-3 z-30 h-10 w-10 items-center justify-center rounded-full bg-card"
           style={{ top: insets.top + 8, elevation: 4 }}
         >
-          <Ionicons name="chevron-back" size={22} color="#171717" />
+          <Ionicons name="chevron-back" size={22} color={night ? "#F4F6FB" : "#171717"} />
         </Pressable>
       ) : null}
       <View className="flex-1">
@@ -316,7 +318,7 @@ function SenderHome({
             <OrderRow order={current} map={false} onOpen={() => onOpen(current)} />
           </View>
         ) : (
-          <View className="mt-3 rounded-3xl bg-white px-5 py-8">
+          <View className="mt-3 rounded-3xl bg-card px-5 py-8">
             <Text className="text-base font-semibold text-ink">{t("sender.empty_live")}</Text>
             <Text className="mt-2 text-sm text-muted">{t("sender.live_hint")}</Text>
           </View>
@@ -486,7 +488,7 @@ function SenderOrders({
 
             <View className="mt-3">
               {visible.length === 0 ? (
-                <View className="rounded-3xl bg-white px-5 py-8">
+                <View className="rounded-3xl bg-card px-5 py-8">
                   <Text className="text-base font-semibold text-ink">
                     {tab === "history" ? t("sender.empty_hist") : t("sender.empty_live")}
                   </Text>
@@ -570,7 +572,7 @@ function SenderChat({
             {mode === "notes" ? (
               <InboxPanel notes={notes} onReadAll={onReadAll} onOpen={onOpenNote} />
             ) : threads.length === 0 ? (
-              <View className="mt-4 rounded-3xl bg-white px-5 py-8">
+              <View className="mt-4 rounded-3xl bg-card px-5 py-8">
                 <Text className="text-base font-semibold text-ink">{t("chat.threads_empty")}</Text>
                 <Text className="mt-2 text-sm text-muted">{t("chat.threads_hint")}</Text>
               </View>
@@ -580,7 +582,7 @@ function SenderChat({
                   key={`${thread.jobKind}-${thread.jobId}`}
                   onPress={() => setOpened(thread)}
                   accessibilityRole="button"
-                  className="mt-3 rounded-3xl bg-white px-4 py-4"
+                  className="mt-3 rounded-3xl bg-card px-4 py-4"
                 >
                   <View className="flex-row items-start justify-between">
                     <Text className="flex-1 pr-2 text-base font-bold text-ink">{thread.title}</Text>
@@ -647,7 +649,7 @@ function Segment({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      className={`flex-1 flex-row items-center justify-center rounded-2xl py-3 ${selected ? "bg-[#121212]" : "bg-white"}`}
+      className={`flex-1 flex-row items-center justify-center rounded-2xl py-3 ${selected ? "bg-[#121212]" : "bg-card"}`}
     >
       <Ionicons
         name={icon === "list" ? "list" : icon === "time" ? "time-outline" : "map-outline"}

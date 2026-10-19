@@ -34,7 +34,7 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
   if (!account) return null;
 
   return (
-    <View className="mt-3 rounded-3xl bg-white px-4 py-3">
+    <View className="mt-3 rounded-3xl bg-card px-4 py-3">
       <View className="flex-row items-center">
         <View className="flex-1 pr-3">
           <Text className="text-base font-bold text-ink">{t("profile")}</Text>
@@ -66,7 +66,7 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
           </Text>
         </View>
         <View className={`h-6 w-11 justify-center rounded-full px-0.5 ${pushOn ? "bg-[#12B76A]" : "bg-slate-300"}`}>
-          <View className={`h-5 w-5 rounded-full bg-white ${pushOn ? "self-end" : "self-start"}`} />
+          <View className={`h-5 w-5 rounded-full bg-card ${pushOn ? "self-end" : "self-start"}`} />
         </View>
       </Pressable>
 

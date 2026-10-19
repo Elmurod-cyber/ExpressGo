@@ -396,7 +396,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
       <View className="px-4 pt-3">
         <View className="flex-row items-center">
           <BrandMark />
-          <View className="ml-3 h-11 flex-1 flex-row items-center rounded-full bg-white px-3">
+          <View className="ml-3 h-11 flex-1 flex-row items-center rounded-full bg-card px-3">
             <Pressable
               onPress={() => void runSearch()}
               disabled={suggesting}
@@ -429,7 +429,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
         {hits.length > 0 ? <PlaceList hits={hits} onPick={(hit) => void chooseHit(hit)} /> : null}
         {notice ? <Text className="mt-2 text-xs text-muted">{notice}</Text> : null}
 
-        <View className="mt-4 rounded-[28px] bg-white p-4">
+        <View className="mt-4 rounded-[28px] bg-card p-4">
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-3">
               <Text className="text-xl font-bold text-ink">
@@ -482,7 +482,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <View className="mr-1 h-1.5 w-1.5 rounded-full bg-white" />
+                    <View className="mr-1 h-1.5 w-1.5 rounded-full bg-card" />
                     <Text className="text-[11px] font-semibold text-white">{t("create.here")}</Text>
                   </>
                 )}
@@ -863,7 +863,7 @@ function PlaceList({
 }) {
   const { t } = useSession();
   return (
-    <View className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <View className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-card">
       {typed && onTyped ? (
         <Pressable
           onPressIn={onTyped}

@@ -213,7 +213,7 @@ function Choice({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" className="mb-2 flex-row items-center rounded-3xl bg-white p-3.5 active:opacity-90">
+    <Pressable onPress={onPress} accessibilityRole="button" className="mb-2 flex-row items-center rounded-3xl bg-card p-3.5 active:opacity-90">
       <View className="h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft">
         <Ionicons name={icon} size={24} color="#155EEF" />
       </View>
@@ -341,7 +341,7 @@ function RiderForm({
             key={n}
             onPress={() => setSeats(n)}
             accessibilityRole="button"
-            className={`mr-2 h-10 w-10 items-center justify-center rounded-xl ${seats === n ? "bg-brand" : "bg-white"}`}
+            className={`mr-2 h-10 w-10 items-center justify-center rounded-xl ${seats === n ? "bg-brand" : "bg-card"}`}
           >
             <Text className={`text-base font-bold ${seats === n ? "text-white" : "text-ink"}`}>{n}</Text>
           </Pressable>
@@ -441,7 +441,7 @@ function MyTrips({
                   onPress={() => setConfirmId(null)}
                   disabled={busy}
                   accessibilityRole="button"
-                  className="flex-1 items-center rounded-2xl bg-[#F8FAFC] py-3"
+                  className="flex-1 items-center rounded-2xl bg-card py-3"
                 >
                   <Text className="text-sm font-bold text-ink">{t("no")}</Text>
                 </Pressable>
@@ -639,13 +639,13 @@ function PlacePick({
       <Pressable
         onPress={() => (open ? close() : setOpen(true))}
         accessibilityRole="button"
-        className={`flex-row items-center rounded-2xl border border-line bg-white ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`}
+        className={`flex-row items-center rounded-2xl border border-line bg-card ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`}
       >
         <Text className={`flex-1 text-base ${shown ? "text-ink" : "text-muted"}`}>{shown}</Text>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color="#98A2B3" />
       </Pressable>
       {open ? (
-        <View className="mt-2 rounded-2xl bg-white px-3 py-2">
+        <View className="mt-2 rounded-2xl bg-card px-3 py-2">
           {other ? (
             <View className="py-2">
               <Pressable onPress={() => setOther(false)} accessibilityRole="button" className="mb-2 flex-row items-center">
@@ -729,7 +729,7 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor="#98A2B3"
         keyboardType={keyboard}
-        className={`rounded-2xl border border-line bg-white text-base text-ink ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`}
+        className={`rounded-2xl border border-line bg-card text-base text-ink ${compact ? "px-3 py-2.5" : "px-4 py-3.5"}`}
       />
     </View>
   );

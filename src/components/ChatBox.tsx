@@ -64,7 +64,7 @@ export function ChatBox({
           messages.map((item) => {
             const mine = item.fromId === userId;
             return (
-              <View key={item.id} className={`mb-2 max-w-[90%] rounded-2xl px-3 py-2 ${mine ? "self-end bg-[#121212]" : "self-start bg-white"}`}>
+              <View key={item.id} className={`mb-2 max-w-[90%] rounded-2xl px-3 py-2 ${mine ? "self-end bg-[#121212]" : "self-start bg-card"}`}>
                 <Text className={`text-sm ${mine ? "text-white" : "text-ink"}`}>{item.text}</Text>
               </View>
             );
@@ -92,18 +92,18 @@ export function ChatBox({
   }
 
   if (expanded) {
-    return <View className="mt-2 rounded-3xl bg-white px-4 py-4">{thread}</View>;
+    return <View className="mt-2 rounded-3xl bg-card px-4 py-4">{thread}</View>;
   }
 
   return (
-    <View className="mt-3 rounded-2xl border border-line bg-[#F7F8FB] px-4 py-3">
+    <View className="mt-3 rounded-2xl border border-line bg-card px-4 py-3">
       <Pressable
         onPress={() => setOpen((prev) => !prev)}
         accessibilityRole="button"
         className="flex-row items-center justify-between"
       >
         <View className="flex-row items-center">
-          <Ionicons name="chatbubble-ellipses-outline" size={16} color="#101828" />
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color="#FF8A00" />
           <Text className="ml-2 text-sm font-semibold text-ink">{t("chat")}</Text>
         </View>
         <Text className="text-xs text-muted">{open ? t("close") : t("chat")}</Text>

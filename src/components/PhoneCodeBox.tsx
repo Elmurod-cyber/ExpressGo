@@ -70,7 +70,7 @@ export function PhoneCodeBox({
         placeholder={t("auth.name_ph")}
         placeholderTextColor="#98A2B3"
         editable={!sent}
-        className="rounded-2xl bg-white px-4 py-3 text-base text-ink"
+        className="rounded-2xl bg-card px-4 py-3 text-base text-ink"
       />
       <Text className="mb-1.5 mt-3 text-sm font-medium text-ink">{t("auth.phone")}</Text>
       <TextInput
@@ -80,7 +80,7 @@ export function PhoneCodeBox({
         placeholderTextColor="#98A2B3"
         keyboardType="phone-pad"
         editable={!sent}
-        className="rounded-2xl bg-white px-4 py-3 text-base text-ink"
+        className="rounded-2xl bg-card px-4 py-3 text-base text-ink"
       />
       {sent ? (
         <>
@@ -93,7 +93,7 @@ export function PhoneCodeBox({
             placeholder={t("otp.code")}
             placeholderTextColor="#98A2B3"
             keyboardType="number-pad"
-            className="mt-2 rounded-2xl bg-white px-4 py-3 text-base text-ink"
+            className="mt-2 rounded-2xl bg-card px-4 py-3 text-base text-ink"
           />
         </>
       ) : null}

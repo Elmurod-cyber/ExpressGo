@@ -74,10 +74,10 @@ export function SignaturePad({ visible, onCancel, onDone }: SignaturePadProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View className="flex-1 justify-end bg-black/40">
-        <View className="rounded-t-[28px] bg-white px-4 pb-6 pt-4">
+        <View className="rounded-t-[28px] bg-card px-4 pb-6 pt-4">
           <Text className="text-lg font-bold text-ink">Mijoz imzosi</Text>
           <Text className="mt-1 text-sm text-muted">Barmoq bilan chizing. Ixtiyoriy.</Text>
-          <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">{pad}</View>
+          <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-card">{pad}</View>
           <View className="mt-4 flex-row">
             <Pressable onPress={clear} accessibilityRole="button" className="flex-1 items-center rounded-2xl border border-slate-200 py-3">
               <Text className="text-sm font-semibold text-muted">Tozalash</Text>

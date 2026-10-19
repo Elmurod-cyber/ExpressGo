@@ -558,9 +558,9 @@ export function OrderDetailSheet({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className={`rounded-[28px] bg-white ${tight ? "px-3 py-2" : "p-4"}`}>{body}</View>
+          <View className={`rounded-[28px] bg-card ${tight ? "px-3 py-2" : "p-4"}`}>{body}</View>
         </ScrollView>
-        {actions ? <View className={`rounded-[28px] bg-white px-3 ${tight ? "mt-2 py-2" : "mt-3 px-4 py-3"}`}>{actions}</View> : null}
+        {actions ? <View className={`rounded-[28px] bg-card px-3 ${tight ? "mt-2 py-2" : "mt-3 px-4 py-3"}`}>{actions}</View> : null}
         {dangerButton ? <View className="mt-2">{dangerButton}</View> : null}
         {pad}
       </View>
@@ -568,7 +568,7 @@ export function OrderDetailSheet({
   }
 
   return (
-    <View className="mt-4 rounded-[28px] bg-white p-4">
+    <View className="mt-4 rounded-[28px] bg-card p-4">
       {body}
       {pad}
     </View>
@@ -709,7 +709,7 @@ function ProofBlock({
         </Pressable>
       ) : null}
       {canSign ? (
-        <Pressable onPress={onSign} accessibilityRole="button" className="mt-2 items-center rounded-2xl border border-slate-200 bg-white py-3">
+        <Pressable onPress={onSign} accessibilityRole="button" className="mt-2 items-center rounded-2xl border border-slate-200 bg-card py-3">
           <Text className="text-sm font-semibold text-ink">{signature ? t("sheet.sign_swap") : t("sheet.sign_opt")}</Text>
         </Pressable>
       ) : null}
@@ -739,7 +739,7 @@ function ProofThumb({ label, uri }: { label: string; uri: string | null }) {
       {uri ? (
         <Image source={{ uri }} style={{ height: 80, width: "100%", borderRadius: 12, backgroundColor: "#E4E7EC" }} resizeMode="cover" />
       ) : (
-        <View className="h-20 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white">
+        <View className="h-20 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-card">
           <Ionicons name="camera-outline" size={18} color="#98A2B3" />
         </View>
       )}
@@ -777,7 +777,7 @@ function CourierRoute({
   phone: string;
 }) {
   return (
-    <View className="mt-2 rounded-3xl border border-slate-200 bg-[#F8FAFC] px-3 py-3">
+    <View className="mt-2 rounded-3xl border border-slate-200 bg-card px-3 py-3">
       {rows.map((row, index) => {
         const color = row.tone === "drop" ? "#027A48" : "#B54708";
         const last = index === rows.length - 1;

@@ -4,7 +4,7 @@ import { useT } from "../context/Session";
 export function HistoryStats({ items }: { items: { label: string; value: string }[] }) {
   const t = useT();
   return (
-    <View className="mb-3 rounded-3xl bg-white px-4 py-4">
+    <View className="mb-3 rounded-3xl bg-card px-4 py-4">
       <Text className="text-base font-bold text-ink">{t("stats")}</Text>
       <View className="mt-3 flex-row flex-wrap">
         {items.map((item) => (

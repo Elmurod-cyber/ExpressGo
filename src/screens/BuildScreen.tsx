@@ -167,7 +167,7 @@ function PublicAds() {
   return (
     <View className="mt-5">
       {!area.place ? (
-        <Pressable onPress={area.openPicker} accessibilityRole="button" className="rounded-2xl bg-white px-4 py-3">
+        <Pressable onPress={area.openPicker} accessibilityRole="button" className="rounded-2xl bg-card px-4 py-3">
           <Text className="text-sm font-semibold text-ink">{t("area.pick")}</Text>
           <Text className="mt-1 text-sm text-muted">{t("area.need")}</Text>
         </Pressable>
@@ -178,7 +178,7 @@ function PublicAds() {
           <ActivityIndicator color="#C2410C" />
         </View>
       ) : shown.length === 0 ? (
-        <View className="mt-3 rounded-3xl bg-white px-5 py-6">
+        <View className="mt-3 rounded-3xl bg-card px-5 py-6">
           <Text className="text-base font-semibold text-ink">{t("city.all_empty")}</Text>
         </View>
       ) : (
@@ -266,7 +266,7 @@ function JobPhotos({ photos }: { photos: string[] }) {
                 <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
               </Pressable>
             ) : null}
-            <Pressable onPress={() => setNear((value) => !value)} accessibilityRole="button" className="rounded-full bg-white px-5 py-3">
+            <Pressable onPress={() => setNear((value) => !value)} accessibilityRole="button" className="rounded-full bg-card px-5 py-3">
               <Text className="text-sm font-bold text-black">{near ? t("build.photo_fit") : t("build.photo_near")}</Text>
             </Pressable>
             {photos.length > 1 ? (
@@ -437,13 +437,13 @@ function AdForm({
       <Pressable
         onPress={() => setTradeOpen((value) => !value)}
         accessibilityRole="button"
-        className="flex-row items-center rounded-2xl border border-line bg-white px-3 py-3"
+        className="flex-row items-center rounded-2xl border border-line bg-card px-3 py-3"
       >
         <Text className={`flex-1 text-base ${tradeName ? "text-ink" : "text-[#98A2B3]"}`}>{tradeName || t("build.trade_ph")}</Text>
         <Ionicons name={tradeOpen ? "chevron-up" : "chevron-down"} size={18} color="#667085" />
       </Pressable>
       {tradeOpen ? (
-        <View className="mt-2 overflow-hidden rounded-2xl border border-line bg-white">
+        <View className="mt-2 overflow-hidden rounded-2xl border border-line bg-card">
           {TRADES.map((item) => (
             <Pressable
               key={item}
@@ -479,7 +479,7 @@ function AdForm({
             placeholder={t("build.about_job")}
             placeholderTextColor="#98A2B3"
             multiline
-            className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+            className="min-h-[88px] rounded-2xl border border-line bg-card px-3 py-2.5 text-base text-ink"
           />
         </View>
       ) : null}
@@ -506,7 +506,7 @@ function AdForm({
                 onPress={() => void addPhoto()}
                 accessibilityRole="button"
                 accessibilityLabel={t("build.photo_add")}
-                className="mb-2 h-[72px] w-[72px] items-center justify-center rounded-xl border border-dashed border-[#C2410C] bg-white"
+                className="mb-2 h-[72px] w-[72px] items-center justify-center rounded-xl border border-dashed border-[#C2410C] bg-card"
               >
                 <Ionicons name="image-outline" size={22} color="#C2410C" />
               </Pressable>
@@ -525,7 +525,7 @@ function AdForm({
             placeholder={t("build.about_offer")}
             placeholderTextColor="#98A2B3"
             multiline
-            className="min-h-[88px] rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+            className="min-h-[88px] rounded-2xl border border-line bg-card px-3 py-2.5 text-base text-ink"
           />
         </View>
       )}
@@ -545,11 +545,11 @@ function AdForm({
           </View>
           <Text className="mb-1 mt-3 text-sm font-medium text-ink">{t("build.workers")}</Text>
           <View className="flex-row items-center">
-            <Pressable onPress={() => setWorkers((value) => Math.max(1, value - 1))} accessibilityRole="button" className="h-10 w-10 items-center justify-center rounded-xl bg-white">
+            <Pressable onPress={() => setWorkers((value) => Math.max(1, value - 1))} accessibilityRole="button" className="h-10 w-10 items-center justify-center rounded-xl bg-card">
               <Text className="text-lg font-bold text-ink">-</Text>
             </Pressable>
             <Text className="mx-4 text-base font-bold text-ink">{workers}</Text>
-            <Pressable onPress={() => setWorkers((value) => Math.min(50, value + 1))} accessibilityRole="button" className="h-10 w-10 items-center justify-center rounded-xl bg-white">
+            <Pressable onPress={() => setWorkers((value) => Math.min(50, value + 1))} accessibilityRole="button" className="h-10 w-10 items-center justify-center rounded-xl bg-card">
               <Text className="text-lg font-bold text-ink">+</Text>
             </Pressable>
           </View>
@@ -637,7 +637,7 @@ function MineAds({
                 <Pressable onPress={() => void remove(card)} disabled={busy} accessibilityRole="button" className="mr-2 flex-1 items-center rounded-2xl bg-[#121212] py-3">
                   <Text className="text-sm font-bold text-white">{card.kind === "job" ? t("build.found") : t("build.delete_yes")}</Text>
                 </Pressable>
-                <Pressable onPress={() => setConfirmId(null)} disabled={busy} accessibilityRole="button" className="flex-1 items-center rounded-2xl bg-[#F8FAFC] py-3">
+                <Pressable onPress={() => setConfirmId(null)} disabled={busy} accessibilityRole="button" className="flex-1 items-center rounded-2xl bg-card py-3">
                   <Text className="text-sm font-bold text-ink">{t("no")}</Text>
                 </Pressable>
               </View>
@@ -647,7 +647,7 @@ function MineAds({
               <Pressable onPress={() => onEdit(card)} accessibilityRole="button" className="mr-2 flex-1 items-center rounded-2xl bg-[#C2410C] py-3">
                 <Text className="text-sm font-bold text-white">{t("build.edit")}</Text>
               </Pressable>
-              <Pressable onPress={() => setConfirmId(card.id)} accessibilityRole="button" className="flex-1 items-center rounded-2xl bg-[#F8FAFC] py-3">
+              <Pressable onPress={() => setConfirmId(card.id)} accessibilityRole="button" className="flex-1 items-center rounded-2xl bg-card py-3">
                 <Text className="text-sm font-bold text-ink">{card.kind === "job" ? t("build.found") : t("build.delete")}</Text>
               </Pressable>
             </View>
@@ -666,11 +666,11 @@ function AreaPick({ region, area, onChange }: { region: string; area: string; on
   return (
     <View className="mt-2">
       <Text className="mb-1 text-sm font-medium text-ink">{t("build.region")}</Text>
-      <Pressable onPress={() => setStep(step === "region" ? "closed" : "region")} accessibilityRole="button" className="rounded-2xl border border-line bg-white px-3 py-3">
+      <Pressable onPress={() => setStep(step === "region" ? "closed" : "region")} accessibilityRole="button" className="rounded-2xl border border-line bg-card px-3 py-3">
         <Text className={region ? "text-base text-ink" : "text-base text-[#98A2B3]"}>{region || t("build.pick_region")}</Text>
       </Pressable>
       {step === "region" ? (
-        <ScrollView className="mt-2 max-h-52 rounded-2xl bg-white" nestedScrollEnabled>
+        <ScrollView className="mt-2 max-h-52 rounded-2xl bg-card" nestedScrollEnabled>
           {groups.map((group) => (
             <Pressable key={group.region} onPress={() => { onChange(group.region, ""); setStep("area"); }} accessibilityRole="button" className="px-3 py-2.5">
               <Text className="text-base text-ink">{group.region}</Text>
@@ -679,11 +679,11 @@ function AreaPick({ region, area, onChange }: { region: string; area: string; on
         </ScrollView>
       ) : null}
       <Text className="mb-1 mt-2 text-sm font-medium text-ink">{t("build.area")}</Text>
-      <Pressable onPress={() => { if (region) setStep(step === "area" ? "closed" : "area"); }} accessibilityRole="button" className="rounded-2xl border border-line bg-white px-3 py-3">
+      <Pressable onPress={() => { if (region) setStep(step === "area" ? "closed" : "area"); }} accessibilityRole="button" className="rounded-2xl border border-line bg-card px-3 py-3">
         <Text className={area ? "text-base text-ink" : "text-base text-[#98A2B3]"}>{area || t("build.pick_area")}</Text>
       </Pressable>
       {step === "area" ? (
-        <ScrollView className="mt-2 max-h-52 rounded-2xl bg-white" nestedScrollEnabled>
+        <ScrollView className="mt-2 max-h-52 rounded-2xl bg-card" nestedScrollEnabled>
           {places.map((place) => (
             <Pressable key={place.id} onPress={() => { onChange(region, place.name); setStep("closed"); }} accessibilityRole="button" className="px-3 py-2.5">
               <Text className="text-base text-ink">{place.name}</Text>
@@ -697,7 +697,7 @@ function AreaPick({ region, area, onChange }: { region: string; area: string; on
 
 function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" className={`mb-2 mr-2 rounded-full px-4 py-2 ${on ? "bg-[#C2410C]" : "bg-white"}`}>
+    <Pressable onPress={onPress} accessibilityRole="button" className={`mb-2 mr-2 rounded-full px-4 py-2 ${on ? "bg-[#C2410C]" : "bg-card"}`}>
       <Text className={`text-sm font-semibold ${on ? "text-white" : "text-ink"}`}>{label}</Text>
     </Pressable>
   );
@@ -726,7 +726,7 @@ function Field({
         placeholderTextColor="#98A2B3"
         keyboardType={keyboard}
         accessibilityLabel={label}
-        className="rounded-2xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+        className="rounded-2xl border border-line bg-card px-3 py-2.5 text-base text-ink"
       />
     </View>
   );

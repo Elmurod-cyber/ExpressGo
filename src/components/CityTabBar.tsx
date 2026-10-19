@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../context/Session";
+import { useNight } from "../services/theme";
 
 export type CityTab = "home" | "orders" | "profile";
 
@@ -19,14 +20,15 @@ const items: {
 export function CityTabBar({ tab, onChange }: { tab: CityTab; onChange: (tab: CityTab) => void }) {
   const insets = useSafeAreaInsets();
   const t = useT();
+  const night = useNight();
   return (
     <View
-      className="flex-row border-t border-[#2A2A2A] bg-[#171717] px-2 pt-0.5"
+      className="flex-row border-t border-line bg-canvas px-2 pt-0.5"
       style={{ paddingBottom: Math.max(insets.bottom, 4) }}
     >
       {items.map((item) => {
         const selected = tab === item.id;
-        const color = selected ? "#FF8A00" : "#A3A3A3";
+        const color = selected ? "#FF8A00" : night ? "#A3A3A3" : "#667085";
         return (
           <Pressable
             key={item.id}
