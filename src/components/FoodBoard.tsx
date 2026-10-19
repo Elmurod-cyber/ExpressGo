@@ -448,6 +448,7 @@ function Qty({ qty, onChange }: { qty: number; onChange: (next: number) => void 
 
 function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () => void; onExpired?: () => void }) {
   const t = useT();
+  const night = useNight();
   const [rows, setRows] = useState<FoodTicket[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -526,12 +527,12 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
         <Text className="mt-3 text-sm text-muted">{t("food.empty")}</Text>
       ) : null}
       {rows.map((ticket) => (
-        <View key={ticket.id} className="mt-3 rounded-2xl bg-[#FFF7ED] px-3 py-3">
-          <Text className="text-sm font-bold text-ink">{ticket.placeName}</Text>
-          <Text className="mt-1 text-xs font-bold text-[#C2410C]">{t(`food.status_${ticket.status}`)}</Text>
+        <View key={ticket.id} className={`mt-3 rounded-2xl px-3 py-3 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#FFF7ED]"}`}>
+          <Text className={`text-sm font-bold ${night ? "text-[#F4F6FB]" : "text-[#171717]"}`}>{ticket.placeName}</Text>
+          <Text className={`mt-1 text-xs font-bold ${night ? "text-[#FF7A40]" : "text-[#C2410C]"}`}>{t(`food.status_${ticket.status}`)}</Text>
           {(editId === ticket.id ? lines : ticket.lines).map((line) => (
             <View key={`${ticket.id}-${line.name}`} className="mt-2 flex-row items-center">
-              <Text className="flex-1 text-sm text-ink">{line.name}</Text>
+              <Text className={`flex-1 text-sm ${night ? "text-[#F4F6FB]" : "text-[#171717]"}`}>{line.name}</Text>
               {editId === ticket.id ? (
                 <View className="flex-row items-center">
                   <Pressable
@@ -541,7 +542,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
                   >
                     <Text className="text-lg font-bold text-[#C2410C]">-</Text>
                   </Pressable>
-                  <Text className="text-sm font-bold text-ink">{line.qty}</Text>
+                  <Text className={`text-sm font-bold ${night ? "text-[#F4F6FB]" : "text-[#171717]"}`}>{line.qty}</Text>
                   <Pressable
                     onPress={() => setLines((prev) => prev.map((item) => (item.name === line.name ? { ...item, qty: Math.min(20, item.qty + 1) } : item)))}
                     accessibilityRole="button"
@@ -551,7 +552,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
                   </Pressable>
                 </View>
               ) : (
-                <Text className="text-sm font-semibold text-ink">{line.qty}</Text>
+                <Text className={`text-sm font-semibold ${night ? "text-[#F4F6FB]" : "text-[#171717]"}`}>{line.qty}</Text>
               )}
             </View>
           ))}
@@ -564,7 +565,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
               className="mt-2 rounded-2xl bg-card px-3 py-2 text-sm text-ink"
             />
           ) : (
-            <Text className="mt-2 text-sm text-muted">{ticket.handoff === "pickup" ? t("food.pickup_self") : ticket.dropoff}</Text>
+            <Text className={`mt-2 text-sm ${night ? "text-[#C8C8C8]" : "text-[#667085]"}`}>{ticket.handoff === "pickup" ? t("food.pickup_self") : ticket.dropoff}</Text>
           )}
           {ticket.status === "new" ? (
             <View className="mt-3 flex-row">
@@ -585,7 +586,7 @@ function FoodMine({ token, onClose, onExpired }: { token: string; onClose?: () =
                   <Text className="text-sm font-bold text-white">{t("trip.edit")}</Text>
                 </Pressable>
               )}
-              <Pressable onPress={() => void cancel(ticket.id)} disabled={busy === ticket.id} accessibilityRole="button" className="flex-1 items-center rounded-2xl bg-[#121212] py-3">
+              <Pressable onPress={() => void cancel(ticket.id)} disabled={busy === ticket.id} accessibilityRole="button" className={`flex-1 items-center rounded-2xl py-3 ${night ? "bg-[#3A3A3A]" : "bg-[#121212]"}`}>
                 <Text className="text-sm font-bold text-white">{t("food.cancel")}</Text>
               </Pressable>
             </View>
