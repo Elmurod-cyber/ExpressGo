@@ -74,6 +74,11 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
   const [locating, setLocating] = useState(false);
   const [dropFocus, setDropFocus] = useState<number | null>(null);
   const [dropHits, setDropHits] = useState<PlaceHit[]>([]);
+  const [pickupHits, setPickupHits] = useState<PlaceHit[]>([]);
+  const [pickupOpen, setPickupOpen] = useState(false);
+  const skipPickup = useRef<string | null>(null);
+  const pickupBlur = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pickupToken = useRef(0);
   const skipDropText = useRef<string | null>(null);
   const dropBlur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropToken = useRef(0);
@@ -91,6 +96,31 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
   }
 
   const dropText = dropFocus == null ? "" : (stops[dropFocus]?.label ?? "");
+  const pickupBias = stops.find((stop) => stop.point)?.point ?? null;
+
+  useEffect(() => {
+    const text = pickup.trim();
+    if (skipPickup.current != null && text === skipPickup.current.trim()) {
+      skipPickup.current = null;
+      setPickupHits([]);
+      return;
+    }
+    if (!pickupOpen || text.length < 2) {
+      setPickupHits([]);
+      return;
+    }
+    let cancelled = false;
+    const token = ++pickupToken.current;
+    const timer = setTimeout(() => {
+      void searchPlaces(text, pickupBias, false).then((rows) => {
+        if (!cancelled && token === pickupToken.current) setPickupHits(rows);
+      });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pickup, pickupOpen, pickupBias]);
 
   useEffect(() => {
     const text = dropText.trim();
@@ -109,7 +139,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
       void searchPlaces(text, pickupPoint.current, true).then((rows) => {
         if (!cancelled && token === dropToken.current) setDropHits(rows);
       });
-    }, 400);
+    }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -139,6 +169,32 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     Keyboard.dismiss();
     keepFoundPlace(hit);
     await applyPoint(hit.point, index, hit.label);
+  }
+
+  function keepPickupTyped() {
+    const label = pickup.trim();
+    if (label.length < 2) return;
+    if (pickupBlur.current) clearTimeout(pickupBlur.current);
+    pickupToken.current += 1;
+    skipPickup.current = label;
+    setPickupHits([]);
+    setPickupOpen(false);
+    setError(null);
+    Keyboard.dismiss();
+    pickupPoint.current = null;
+    forgetRoute();
+  }
+
+  async function choosePickup(hit: PlaceHit) {
+    if (pickupBlur.current) clearTimeout(pickupBlur.current);
+    pickupToken.current += 1;
+    skipPickup.current = hit.label;
+    setPickupHits([]);
+    setPickupOpen(false);
+    setError(null);
+    Keyboard.dismiss();
+    keepFoundPlace(hit);
+    await applyPoint(hit.point, "pickup", hit.label);
   }
 
   function focusDrop(index: number) {
@@ -366,7 +422,18 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
             finding={finding}
             onSearch={() => void searchText(pickup, "pickup")}
             onClear={clearPickup}
-            onFocus={() => setPin("pickup")}
+            onFocus={() => {
+              if (pickupBlur.current) clearTimeout(pickupBlur.current);
+              setPickupOpen(true);
+              setPin("pickup");
+            }}
+            onBlur={() => {
+              if (pickupBlur.current) clearTimeout(pickupBlur.current);
+              pickupBlur.current = setTimeout(() => {
+                setPickupOpen(false);
+                setPickupHits([]);
+              }, 250);
+            }}
             aside={
               <Pressable
                 onPress={() => void useHere()}
@@ -386,6 +453,14 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
               </Pressable>
             }
           />
+          {pickupOpen && pickup.trim().length >= 2 ? (
+            <PlaceList
+              typed={pickup.trim()}
+              hits={pickupHits}
+              onTyped={keepPickupTyped}
+              onPick={(hit) => void choosePickup(hit)}
+            />
+          ) : null}
           {stops.map((stop, index) => (
             <View key={`stop-${index}`}>
               <AddressField
@@ -762,8 +837,10 @@ function PlaceList({
   onPick: (hit: PlaceHit) => void;
 }) {
   const { t } = useSession();
+  const night = useNight();
+  const line = night ? "border-[#3A3A3A]" : "border-slate-200";
   return (
-    <View className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-card">
+    <View className={`mt-2 overflow-hidden rounded-2xl border bg-card ${line}`}>
       {typed && onTyped ? (
         <Pressable
           onPressIn={onTyped}
@@ -784,7 +861,7 @@ function PlaceList({
           key={`${hit.source}-${hit.label}-${index}`}
           onPressIn={() => onPick(hit)}
           accessibilityRole="button"
-          className={`flex-row items-center px-4 py-3 ${typed || index > 0 ? "border-t border-slate-100" : ""}`}
+          className={`flex-row items-center px-4 py-3 ${typed || index > 0 ? `border-t ${line}` : ""}`}
         >
           <Ionicons
             name={hit.source === "own" ? "bookmark" : "location-outline"}

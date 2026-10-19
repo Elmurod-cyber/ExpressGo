@@ -47,6 +47,12 @@ export function hasCyrillic(value: string): boolean {
   return /[\u0400-\u04FF]/.test(value);
 }
 
+const LATIN_TO_CYR: Record<string, string> = {
+  a: "а", b: "б", d: "д", e: "е", f: "ф", g: "г", h: "ҳ", i: "и", j: "ж",
+  k: "к", l: "л", m: "м", n: "н", o: "о", p: "п", q: "қ", r: "р", s: "с",
+  t: "т", u: "у", v: "в", x: "х", y: "й", z: "з",
+};
+
 function transliterate(value: string): string {
   let out = "";
   for (const ch of value) {
@@ -58,6 +64,120 @@ function transliterate(value: string): string {
     out += ch === ch.toLowerCase() ? mapped : mapped.charAt(0).toUpperCase() + mapped.slice(1);
   }
   return out;
+}
+
+function toCyrillic(value: string): string {
+  const text = value.toLowerCase();
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const three = text.slice(i, i + 2);
+    const pair = text.slice(i, i + 2);
+    if (three === "o'" || three === "o‘" || three === "o’" || three === "oʻ" || three === "o`") {
+      out += "ў";
+      i += 1;
+      continue;
+    }
+    if (three === "g'" || three === "g‘" || three === "g’" || three === "gʻ" || three === "g`") {
+      out += "ғ";
+      i += 1;
+      continue;
+    }
+    if (pair === "sh") {
+      out += "ш";
+      i += 1;
+      continue;
+    }
+    if (pair === "ch") {
+      out += "ч";
+      i += 1;
+      continue;
+    }
+    if (pair === "yo") {
+      out += "ё";
+      i += 1;
+      continue;
+    }
+    if (pair === "yu") {
+      out += "ю";
+      i += 1;
+      continue;
+    }
+    if (pair === "ya") {
+      out += "я";
+      i += 1;
+      continue;
+    }
+    const ch = text[i] ?? "";
+    if (ch === "'" || ch === "‘" || ch === "’" || ch === "`") continue;
+    out += LATIN_TO_CYR[ch] ?? ch;
+  }
+  return out;
+}
+
+/** Qidiruv kaliti: kirill va lotin bitta yozuvga tushadi. */
+export function latinKey(value: string): string {
+  return transliterate(value)
+    .toLowerCase()
+    .replace(/['`\u02BB\u02BC\u2018\u2019]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Nominatimga ketadigan ikki yozuv: lotin va kirill. */
+export function addressQueries(value: string): string[] {
+  const text = value.trim().replace(/\s+/g, " ");
+  if (text.length < 2) return [];
+  const latin = transliterate(text).replace(/\s+/g, " ").trim();
+  const cyrillic = hasCyrillic(text) ? text : toCyrillic(latin);
+  const rows = hasCyrillic(text) ? [text, latin] : [latin, cyrillic];
+  const out: string[] = [];
+  for (const row of rows) {
+    if (row.length < 2) continue;
+    if (out.some((item) => item.toLowerCase() === row.toLowerCase())) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+function editDistance(left: string, right: string): number {
+  if (left === right) return 0;
+  if (Math.abs(left.length - right.length) > 2) return 3;
+  const prev = new Array<number>(right.length + 1);
+  const next = new Array<number>(right.length + 1);
+  for (let col = 0; col <= right.length; col += 1) prev[col] = col;
+  for (let row = 1; row <= left.length; row += 1) {
+    next[0] = row;
+    let best = next[0];
+    for (let col = 1; col <= right.length; col += 1) {
+      const cost = left[row - 1] === right[col - 1] ? 0 : 1;
+      next[col] = Math.min(prev[col] + 1, next[col - 1] + 1, prev[col - 1] + cost);
+      if (next[col] < best) best = next[col];
+    }
+    if (best > 2) return 3;
+    for (let col = 0; col <= right.length; col += 1) prev[col] = next[col];
+  }
+  return prev[right.length] ?? 3;
+}
+
+/** Aniq moslik yuqori, 1-2 harf xatosi pastda, lekin baribir chiqadi. */
+export function addressScore(queryKey: string, nameKey: string): number {
+  if (queryKey.length < 2 || nameKey.length < 2) return 0;
+  if (queryKey === nameKey) return 1000 + nameKey.length;
+  if (nameKey.startsWith(queryKey)) return 500 + queryKey.length;
+  if (nameKey.includes(queryKey) && queryKey.length >= 3) return 200 + queryKey.length;
+  if (queryKey.includes(nameKey) && nameKey.length >= 4) return 180 + nameKey.length;
+  const words = queryKey.split(" ").filter((word) => word.length >= 4);
+  const targets = [nameKey, ...nameKey.split(" ").filter((word) => word.length >= 4)];
+  let best = 0;
+  for (const word of words.length > 0 ? words : [queryKey]) {
+    if (word.length < 4) continue;
+    for (const target of targets) {
+      const allow = word.length >= 8 ? 2 : 1;
+      const dist = editDistance(word, target);
+      if (dist > 0 && dist <= allow) best = Math.max(best, 140 - dist * 30);
+    }
+  }
+  return best;
 }
 
 /** Telefon geokoderi ruscha yoki inglizcha qaytarsa, manzilni o'zbekcha yozuvga o'tkazadi. */

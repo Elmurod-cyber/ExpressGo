@@ -1,4 +1,5 @@
 import { kmBetween, type MapPoint } from "../services/distance";
+import { addressScore, latinKey } from "../services/uzbekAddress";
 import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { sameHash, sha256 } from "./sha256";
 import { listingArea } from "./places";
@@ -2048,11 +2049,7 @@ function writeSaved(owner: SavedAddresses, slot: SavedSlot, place: SavedPlace | 
 }
 
 function locationKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/['`‘’]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return latinKey(name);
 }
 
 function customRow(name: string): CustomLocation | null {
@@ -2075,10 +2072,7 @@ export function listCustomLocations(query: string, limit = 5): { label: string; 
     .map((item) => {
       const name = locationKey(item.name);
       if (name.length < 3 || name.startsWith("tanlangan nuqta")) return null;
-      let score = 0;
-      if (name === key) score = 1000;
-      else if (name.startsWith(key)) score = 500;
-      else if (name.includes(key) || (key.includes(name) && name.length >= 4)) score = 200;
+      const score = addressScore(key, name);
       if (score === 0) return null;
       return { item, score };
     })

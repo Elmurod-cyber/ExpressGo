@@ -4,7 +4,7 @@ import { kmBetween } from "./distance";
 import { PLACES } from "../server/places";
 import { listCustomLocations, noteCustomLocation } from "../server/store";
 import { scheduleStoreSave } from "../server/persist";
-import { addressInUzbek, hasCyrillic } from "./uzbekAddress";
+import { addressInUzbek, addressQueries, addressScore, hasCyrillic, latinKey } from "./uzbekAddress";
 
 export type { MapPoint } from "./distance";
 export { kmBetween } from "./distance";
@@ -47,11 +47,7 @@ const KNOWN_PLACES: { keys: string[]; label: string; point: MapPoint }[] = [
 ];
 
 function foldName(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/['`\u02BB\u02BC\u2018\u2019]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return latinKey(value);
 }
 
 function inUzbekistan(point: MapPoint): boolean {
@@ -76,11 +72,7 @@ function rankCatalog(query: string): FoundPlace[] {
   for (const place of catalogPlaces()) {
     let score = 0;
     for (const key of place.keys) {
-      let next = 0;
-      if (folded === key) next = 1000 + key.length;
-      else if (key.startsWith(folded) && folded.length >= 2) next = 500 + folded.length;
-      else if (key.includes(folded) && folded.length >= 3) next = 200 + folded.length;
-      else if (folded.includes(key) && key.length >= 4) next = 180 + key.length;
+      const next = addressScore(folded, key);
       if (next > score) score = next;
     }
     if (score > 0) scored.push({ place: { point: place.point, label: place.label }, score });
@@ -206,13 +198,19 @@ export async function searchPlaces(query: string, bias?: MapPoint | null, nearby
     own.push({ point: place.point, label: place.label, source: "own", km: place.km });
   }
   const remoteTask = (async () => {
-    try {
-      const near = bias ? await nominatimHits(text, bias, nearby) : [];
-      if (near.length > 0) return near;
-      return await nominatimHits(text, null);
-    } catch {
-      return [];
-    }
+    const queries = addressQueries(text);
+    const groups = await Promise.all(
+      queries.map(async (item) => {
+        try {
+          const near = bias ? await nominatimHits(item, bias, nearby) : [];
+          if (near.length > 0) return near;
+          return await nominatimHits(item, null);
+        } catch {
+          return [];
+        }
+      }),
+    );
+    return groups.flat();
   })();
   const map: PlaceHit[] = [];
   for (const place of rankCatalog(text)) {
