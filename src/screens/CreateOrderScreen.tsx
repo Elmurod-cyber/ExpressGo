@@ -13,6 +13,7 @@ import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import { COURIER_VEHICLES, MAX_DROPOFFS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, readySlotOf, type ReadySlotId } from "../server/rules";
 import type { SenderOrder, VehicleKind } from "../types";
 import { BrandMark } from "../components/BrandMark";
+import { useNight } from "../services/theme";
 
 type CreateMode = "create" | "edit" | "repeat";
 
@@ -43,6 +44,7 @@ function editReceiverPhone(next: string, prev: string): string {
 
 export function CreateOrderScreen({ onDone, mode = "create", draft = null }: CreateOrderScreenProps) {
   const { account, t } = useSession();
+  const night = useNight();
   const mapRef = useRef<MapPickerHandle>(null);
   const pickupPoint = useRef<MapPoint | null>(null);
   const [query, setQuery] = useState("");
@@ -448,13 +450,13 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
             </Pressable>
           </View>
 
-          <View className="mt-4 flex-row items-center rounded-2xl border border-slate-200 px-4">
+          <View className={`mt-4 flex-row items-center rounded-2xl border px-4 ${night ? "border-[#3A3A3A] bg-[#2C2C2C]" : "border-slate-200"}`}>
             <TextInput
               value={item}
               onChangeText={setItem}
               placeholder={t("create.item_ph")}
               placeholderTextColor="#98A2B3"
-              className="flex-1 py-3.5 text-base text-ink"
+              className="flex-1 bg-transparent py-3.5 text-base text-ink"
             />
             {item.trim() ? <ClearButton onPress={() => setItem("")} /> : null}
           </View>
@@ -532,9 +534,9 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
                 setPin(stops.length);
               }}
               accessibilityRole="button"
-              className="mt-2 self-start rounded-full bg-slate-100 px-3 py-2"
+              className={`mt-2 self-start rounded-full px-3 py-2 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-slate-100"}`}
             >
-              <Text className="text-xs font-semibold text-ink">{t("create.more_stop")}</Text>
+              <Text className={`text-xs font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{t("create.more_stop")}</Text>
             </Pressable>
           ) : null}
 
@@ -630,7 +632,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
             editable={false}
           />
 
-          <View className="mt-3 rounded-2xl border border-slate-200 px-3 py-2">
+          <View className={`mt-3 rounded-2xl border px-3 py-2 ${night ? "border-[#3A3A3A] bg-[#2C2C2C]" : "border-slate-200"}`}>
             <View className="flex-row items-start">
               <View className="min-w-0 flex-1">
                 {noteFocused || note.trim().length > 0 ? null : (
@@ -655,7 +657,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
                     setNoteHeight((prev) => (Math.abs(prev - next) > 1 ? Math.max(24, next) : prev));
                   }}
                   style={{ height: noteHeight }}
-                  className="py-1 text-base text-ink"
+                  className="bg-transparent py-1 text-base text-ink"
                 />
               </View>
               {note.trim() ? (
@@ -675,7 +677,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
             <Pressable
               onPress={() => onDone()}
               accessibilityRole="button"
-              className="mr-2 flex-1 items-center rounded-2xl border border-slate-200 py-3.5"
+              className={`mr-2 flex-1 items-center rounded-2xl border py-3.5 ${night ? "border-[#3A3A3A]" : "border-slate-200"}`}
             >
               <Text className="text-base font-semibold text-ink">{t("cancel")}</Text>
             </Pressable>
@@ -683,9 +685,9 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
               onPress={() => void submit()}
               disabled={busy}
               accessibilityRole="button"
-              className="ml-2 flex-1 items-center rounded-2xl bg-[#121212] py-3.5 active:opacity-90"
+              className={`ml-2 flex-1 items-center rounded-2xl py-3.5 active:opacity-90 ${night ? "bg-[#FF8A00]" : "bg-[#121212]"}`}
             >
-              <Text className="text-base font-semibold text-white">
+              <Text className={`text-base font-semibold ${night ? "text-[#171717]" : "text-white"}`}>
                 {busy
                   ? t("auth.wait")
                   : mode === "edit"
@@ -751,15 +753,18 @@ function AddressField({
   expandOnFocus?: boolean;
 }) {
   const { t } = useSession();
+  const night = useNight();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const writing = expandOnFocus && (focused || value.trim().length > 0);
+  const frame = night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "border border-slate-200";
+  const searchColor = night ? "#F4F6FB" : "#121212";
   const clear = value.trim() ? (
     <ClearButton onPress={() => (onClear ? onClear() : onChangeText(""))} />
   ) : null;
   if (compact) {
     return (
-      <View className="mt-3 w-full flex-row items-center rounded-2xl border border-slate-200 px-3 py-1">
+      <View className={`mt-3 w-full flex-row items-center rounded-2xl px-3 py-1 ${frame}`}>
         {writing ? null : (
           <Pressable
             onPress={() => inputRef.current?.focus()}
@@ -787,7 +792,7 @@ function AddressField({
             onBlur?.();
           }}
           accessibilityLabel={label}
-          className="ml-1 min-w-0 flex-1 py-1 text-base text-ink"
+          className="ml-1 min-w-0 flex-1 bg-transparent py-1 text-base text-ink"
         />
         {clear}
         {aside ?? (
@@ -798,14 +803,14 @@ function AddressField({
             accessibilityLabel={`${label}ni qidirish`}
             className="h-8 w-8 items-center justify-center"
           >
-            {finding ? <ActivityIndicator size="small" color="#98A2B3" /> : <Ionicons name="search" size={16} color="#121212" />}
+            {finding ? <ActivityIndicator size="small" color="#98A2B3" /> : <Ionicons name="search" size={16} color={searchColor} />}
           </Pressable>
         )}
       </View>
     );
   }
   return (
-    <View className="mt-3 rounded-2xl border border-slate-200 px-3 py-2.5">
+    <View className={`mt-3 rounded-2xl px-3 py-2.5 ${frame}`}>
       <View className="flex-row items-center">
         <Ionicons name="location-sharp" size={14} color="#98A2B3" />
         <Text className="ml-1 flex-1 text-xs font-medium text-muted">{label}</Text>
@@ -826,7 +831,7 @@ function AddressField({
           onFocus={onFocus}
           onBlur={onBlur}
           accessibilityLabel={label}
-          className="flex-1 py-1.5 text-base text-ink"
+          className="flex-1 bg-transparent py-1.5 text-base text-ink"
         />
         {clear}
         <Pressable
@@ -836,7 +841,7 @@ function AddressField({
           accessibilityLabel={`${label}ni qidirish`}
           className="h-10 w-10 items-center justify-center"
         >
-          {finding ? <ActivityIndicator size="small" color="#98A2B3" /> : <Ionicons name="search" size={18} color="#121212" />}
+          {finding ? <ActivityIndicator size="small" color="#98A2B3" /> : <Ionicons name="search" size={18} color={searchColor} />}
         </Pressable>
       </View>
     </View>
@@ -918,11 +923,12 @@ function LabeledBox({
   keyboardType?: "default" | "phone-pad" | "number-pad" | "decimal-pad";
   editable?: boolean;
 }) {
+  const night = useNight();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const writing = editable && (focused || value.trim().length > 0);
   return (
-    <View className={`mt-3 w-full flex-row items-center rounded-2xl border border-slate-200 px-3 py-1 ${editable ? "" : "bg-[#F7F8FB]"}`}>
+    <View className={`mt-3 w-full flex-row items-center rounded-2xl border px-3 py-1 ${night ? "border-[#3A3A3A] bg-[#2C2C2C]" : editable ? "border-slate-200" : "border-slate-200 bg-[#F7F8FB]"}`}>
       {writing ? null : (
         <Pressable
           onPress={() => inputRef.current?.focus()}
@@ -945,7 +951,7 @@ function LabeledBox({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         accessibilityLabel={label}
-        className="ml-1 min-w-0 flex-1 py-1 text-base text-ink"
+        className="ml-1 min-w-0 flex-1 bg-transparent py-1 text-base text-ink"
       />
       {editable && value.trim() && onChangeText ? <ClearButton onPress={() => onChangeText("")} /> : null}
     </View>
@@ -954,28 +960,38 @@ function LabeledBox({
 
 function ClearButton({ onPress }: { onPress: () => void }) {
   const { t } = useSession();
+  const night = useNight();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={t("create.clear")}
       hitSlop={8}
-      className="ml-1 h-7 w-7 items-center justify-center rounded-full bg-slate-100"
+      className={`ml-1 h-7 w-7 items-center justify-center rounded-full ${night ? "bg-[#3A3A3A]" : "bg-slate-100"}`}
     >
-      <Ionicons name="close" size={14} color="#667085" />
+      <Ionicons name="close" size={14} color={night ? "#F4F6FB" : "#667085"} />
     </Pressable>
   );
 }
 
 function Chip({ label, dark, onPress }: { label: string; dark: boolean; onPress: () => void }) {
+  const night = useNight();
+  const face = dark
+    ? night
+      ? "bg-[#F4F6FB]"
+      : "bg-[#121212]"
+    : night
+      ? "border border-[#3A3A3A] bg-[#2C2C2C]"
+      : "bg-slate-100";
+  const ink = dark ? (night ? "text-[#171717]" : "text-white") : night ? "text-[#F4F6FB]" : "text-ink";
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: dark }}
-      className={`mb-1 mr-1 rounded-full px-3 py-2 ${dark ? "bg-[#121212]" : "bg-slate-100"}`}
+      className={`mb-1 mr-1 rounded-full px-3 py-2 ${face}`}
     >
-      <Text className={`text-xs font-semibold ${dark ? "text-white" : "text-ink"}`}>{label}</Text>
+      <Text className={`text-xs font-semibold ${ink}`}>{label}</Text>
     </Pressable>
   );
 }

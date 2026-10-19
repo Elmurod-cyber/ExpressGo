@@ -11,6 +11,7 @@ import { SignaturePad } from "./SignaturePad";
 import { VEHICLE_LABEL, formatWaitSec, readyHint, waitClock } from "../server/rules";
 import { t } from "../i18n";
 import { useT } from "../context/Session";
+import { useNight } from "../services/theme";
 
 function sheetSteps() {
   return [
@@ -186,6 +187,7 @@ export function OrderDetailSheet({
 }: OrderDetailSheetProps) {
   const translate = useT();
   void translate;
+  const night = useNight();
   const waiting = status === "posted";
   const current = rank[status];
   const phone = customerPhone?.replace(/\D/g, "") ?? "";
@@ -260,8 +262,8 @@ export function OrderDetailSheet({
 
   const tight = proofRole === "courier";
   const vehiclePill = vehicle ? (
-    <View className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1">
-      <Text className="text-xs font-semibold text-ink">{VEHICLE_LABEL[vehicle]}</Text>
+    <View className={`shrink-0 rounded-full px-2.5 py-1 ${night ? "bg-[#3A3A3A]" : "bg-slate-100"}`}>
+      <Text className={`text-xs font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{VEHICLE_LABEL[vehicle]}</Text>
     </View>
   ) : null;
   const callButton = (
@@ -272,7 +274,7 @@ export function OrderDetailSheet({
       className={`${tight ? "mt-2 py-3" : "mt-4 py-3.5"} flex-row items-center justify-center rounded-2xl ${phone ? "bg-[#FFD000] active:opacity-90" : "bg-[#FFF3B0]"}`}
     >
       <Ionicons name="call-outline" size={16} color={phone ? "#101828" : "#98A2B3"} />
-      <Text className={`ml-2 text-base font-semibold ${phone ? "text-ink" : "text-muted"}`}>{t("sheet.call")}</Text>
+      <Text className={`ml-2 text-base font-semibold ${phone ? "text-[#171717]" : "text-[#667085]"}`}>{t("sheet.call")}</Text>
     </Pressable>
   );
   const routeRows: { key: string; label: string; value: string; tone: "pick" | "drop"; onMap: (() => void) | null }[] = [];
@@ -465,18 +467,18 @@ export function OrderDetailSheet({
         <InfoBox icon="call-outline" label={t("sheet.phone")} value={phone || t("sheet.hidden_name")} />
       </View>
       {vehicle ? (
-        <View className="mt-3 rounded-2xl bg-[#F7F8FB] px-4 py-3">
-          <Text className="text-xs text-muted">{t("create.vehicle")}</Text>
-          <Text className="mt-1 text-base font-semibold text-ink">{VEHICLE_LABEL[vehicle]}</Text>
+        <View className={`mt-3 rounded-2xl px-4 py-3 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#F7F8FB]"}`}>
+          <Text className={`text-xs ${night ? "text-[#C8C8C8]" : "text-muted"}`}>{t("create.vehicle")}</Text>
+          <Text className={`mt-1 text-base font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{VEHICLE_LABEL[vehicle]}</Text>
         </View>
       ) : null}
         </>
       )}
 
       {waiting && readyAt != null && readyHint(readyAt) ? (
-        <View className="mt-3 rounded-2xl bg-[#FFF6E5] px-4 py-3">
-          <Text className="text-xs text-[#C47E09]">{t("later")}</Text>
-          <Text className="mt-1 text-base font-semibold text-ink">{readyHint(readyAt)}</Text>
+        <View className={`mt-3 rounded-2xl px-4 py-3 ${night ? "bg-[#3A2A1C]" : "bg-[#FFF6E5]"}`}>
+          <Text className={`text-xs ${night ? "text-[#FFB067]" : "text-[#C47E09]"}`}>{t("later")}</Text>
+          <Text className={`mt-1 text-base font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{readyHint(readyAt)}</Text>
         </View>
       ) : null}
 
@@ -485,9 +487,9 @@ export function OrderDetailSheet({
       <WaitBox status={status} arrivedAt={arrivedAt} storedFee={waitFee} slim={tight} />
 
       {proofRole === "courier" ? null : cancelTotal != null && cancelTotal > 0 ? (
-        <View className="mt-3 rounded-2xl bg-[#FEF3F2] px-4 py-3">
-          <Text className="text-xs text-[#B42318]">{t("sheet.cancel_fee")}</Text>
-          <Text className="mt-1 text-base font-bold text-ink">{t("sheet.cash_to", { money: formatMoney(cancelTotal) })}</Text>
+        <View className={`mt-3 rounded-2xl px-4 py-3 ${night ? "bg-[#3A2220]" : "bg-[#FEF3F2]"}`}>
+          <Text className={`text-xs ${night ? "text-[#FF8B7A]" : "text-[#B42318]"}`}>{t("sheet.cancel_fee")}</Text>
+          <Text className={`mt-1 text-base font-bold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{t("sheet.cash_to", { money: formatMoney(cancelTotal) })}</Text>
           {cancelLabel ? <Text className="mt-1 text-xs text-muted">{cancelLabel}</Text> : null}
         </View>
       ) : cancelLabel && status !== "cancelled" ? (
@@ -586,6 +588,7 @@ function WaitBox({
   storedFee: number | null;
   slim?: boolean;
 }) {
+  const night = useNight();
   const live = status === "accepted" && arrivedAt != null;
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -606,10 +609,10 @@ function WaitBox({
       : t("sheet.wait_fee", { money: formatMoney(clock.fee) });
   if (slim) {
     return (
-      <View className="mt-2 rounded-2xl bg-[#FFF6E5] px-3 py-2">
+      <View className={`mt-2 rounded-2xl px-3 py-2 ${night ? "bg-[#3A2A1C]" : "bg-[#FFF6E5]"}`}>
         <View className="flex-row items-center">
-          <Ionicons name="time-outline" size={16} color="#C47E09" />
-          <Text className="ml-2 flex-1 text-sm font-semibold text-ink">{line}</Text>
+          <Ionicons name="time-outline" size={16} color={night ? "#FFB067" : "#C47E09"} />
+          <Text className={`ml-2 flex-1 text-sm font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{line}</Text>
         </View>
         {clock.maxed && !(live && clock.freeLeftSec > 0) ? (
           <Text className="mt-1 text-xs text-[#C47E09]">{t("sheet.wait_max")}</Text>
@@ -618,13 +621,13 @@ function WaitBox({
     );
   }
   return (
-    <View className="mt-3 rounded-2xl bg-[#FFF6E5] px-4 py-3">
-      <Text className="text-xs text-[#C47E09]">{t("sheet.wait")}</Text>
+    <View className={`mt-3 rounded-2xl px-4 py-3 ${night ? "bg-[#3A2A1C]" : "bg-[#FFF6E5]"}`}>
+      <Text className={`text-xs ${night ? "text-[#FFB067]" : "text-[#C47E09]"}`}>{t("sheet.wait")}</Text>
       {live && clock.freeLeftSec > 0 ? (
-        <Text className="mt-1 text-base font-bold text-ink">{t("sheet.free_wait", { time: formatWaitSec(clock.freeLeftSec) })}</Text>
+        <Text className={`mt-1 text-base font-bold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{t("sheet.free_wait", { time: formatWaitSec(clock.freeLeftSec) })}</Text>
       ) : (
         <>
-          <Text className="mt-1 text-base font-bold text-ink">{t("sheet.wait_fee", { money: formatMoney(clock.fee) })}</Text>
+          <Text className={`mt-1 text-base font-bold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{t("sheet.wait_fee", { money: formatMoney(clock.fee) })}</Text>
           {clock.maxed ? <Text className="mt-1 text-xs text-muted">{t("sheet.wait_max")}</Text> : null}
         </>
       )}
@@ -666,8 +669,9 @@ function ProofBlock({
   onRate?: (stars: number) => void;
 }) {
   const [open, setOpen] = useState(proofRole !== "courier");
+  const night = useNight();
   return (
-    <View className="mt-2 rounded-2xl bg-[#F7F8FB] px-3 py-2">
+    <View className={`mt-2 rounded-2xl px-3 py-2 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#F7F8FB]"}`}>
       <Pressable
         onPress={() => setOpen((value) => !value)}
         accessibilityRole="button"
@@ -835,8 +839,15 @@ function AddressBox({
   tone?: "pick" | "drop";
   onMap?: (() => void) | null;
 }) {
-  const fill = tone === "drop" ? "bg-[#D1FADF]" : "bg-[#FFE8CC]";
-  const ink = tone === "drop" ? "#027A48" : "#B54708";
+  const night = useNight();
+  const fill = night
+    ? tone === "drop"
+      ? "bg-[#163328]"
+      : "bg-[#3A2A1C]"
+    : tone === "drop"
+      ? "bg-[#D1FADF]"
+      : "bg-[#FFE8CC]";
+  const ink = night ? (tone === "drop" ? "#6EE7B7" : "#FFB067") : tone === "drop" ? "#027A48" : "#B54708";
   return (
     <View className={`flex-row items-center ${tight ? "mt-2 px-3 py-2" : "mt-3 px-4 py-3"} rounded-2xl ${fill}`}>
       <View className="min-w-0 flex-1" style={{ flex: 1, minWidth: 0 }}>
@@ -844,7 +855,7 @@ function AddressBox({
           <Ionicons name={icon} size={16} color={ink} />
           <Text className="ml-1 flex-1 text-base font-semibold" style={{ color: ink }}>{label}</Text>
         </View>
-        <Text className={`${tight ? "mt-0.5" : "mt-1"} text-xl font-semibold text-ink`}>{value}</Text>
+        <Text className={`${tight ? "mt-0.5" : "mt-1"} text-xl font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{value}</Text>
       </View>
       {onMap ? (
         <Pressable
@@ -862,13 +873,14 @@ function AddressBox({
 }
 
 function InfoBox({ icon, label, value, tight = false }: { icon: "person-outline" | "call-outline"; label: string; value: string; tight?: boolean }) {
+  const night = useNight();
   return (
-    <View className={`flex-1 rounded-2xl bg-[#F7F8FB] ${tight ? "px-3 py-2" : "px-4 py-3"}`}>
+    <View className={`flex-1 rounded-2xl ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#F7F8FB]"} ${tight ? "px-3 py-2" : "px-4 py-3"}`}>
       <View className="flex-row items-center">
-        <Ionicons name={icon} size={14} color="#98A2B3" />
-        <Text className="ml-1 text-xs text-muted">{label}</Text>
+        <Ionicons name={icon} size={14} color={night ? "#C8C8C8" : "#98A2B3"} />
+        <Text className={`ml-1 text-xs ${night ? "text-[#C8C8C8]" : "text-muted"}`}>{label}</Text>
       </View>
-      <Text className={`${tight ? "mt-0.5 text-sm" : "mt-1 text-base"} font-semibold text-ink`}>{value}</Text>
+      <Text className={`${tight ? "mt-0.5 text-sm" : "mt-1 text-base"} font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{value}</Text>
     </View>
   );
 }
