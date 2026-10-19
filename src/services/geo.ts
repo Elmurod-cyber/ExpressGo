@@ -160,10 +160,10 @@ function rememberPlace(name: string, point: MapPoint) {
   if (noteCustomLocation(name, point)) scheduleStoreSave();
 }
 
-export type PlaceSource = "own" | "map";
+export type PlaceSource = "own" | "map" | "used";
 
 export type PlaceHit = {
-  point: MapPoint;
+  point: MapPoint | null;
   label: string;
   source: PlaceSource;
   km?: number | null;
@@ -171,7 +171,7 @@ export type PlaceHit = {
 
 function alreadyListed(rows: PlaceHit[], point: MapPoint, label: string): boolean {
   const folded = foldName(label);
-  return rows.some((row) => foldName(row.label) === folded || kmBetween(row.point, point) < 0.15);
+  return rows.some((row) => foldName(row.label) === folded || (row.point != null && kmBetween(row.point, point) < 0.15));
 }
 
 /** Yetkazish taklifi: olish nuqtasidan shu masofadagi xotira joylari yuqoriga chiqadi. */
@@ -232,6 +232,7 @@ export async function searchPlaces(query: string, bias?: MapPoint | null, nearby
 }
 
 export function keepFoundPlace(hit: PlaceHit) {
+  if (!hit.point) return;
   if (hit.source !== "own" && isCatalogLabel(hit.label)) return;
   rememberPlace(hit.label, hit.point);
 }
@@ -240,7 +241,7 @@ export async function findPlace(query: string, bias?: MapPoint | null): Promise<
   const text = query.trim();
   if (text.length < 2) return null;
   const top = (await searchPlaces(text, bias))[0];
-  if (top) {
+  if (top?.point) {
     keepFoundPlace(top);
     return { point: top.point, label: top.label };
   }

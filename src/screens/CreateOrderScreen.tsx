@@ -7,8 +7,9 @@ import { MapPicker, type MapPickerHandle } from "../components/MapPicker";
 import { Screen } from "../components/Screen";
 import { useSession } from "../context/Session";
 import { api } from "../services/api";
-import { describePoint, findPlace, keepFoundPlace, searchPlaces, type MapPoint, type PlaceHit } from "../services/geo";
+import { describePoint, findPlace, keepFoundPlace, kmBetween, searchPlaces, type MapPoint, type PlaceHit } from "../services/geo";
 import { roadTrip } from "../services/route";
+import { latinKey } from "../services/uzbekAddress";
 import { formatMoney } from "../services/money";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import { COURIER_VEHICLES, MAX_DROPOFFS, READY_SLOTS, VEHICLE_LABEL, formatReadyAt, readySlotOf, type ReadySlotId } from "../server/rules";
@@ -112,7 +113,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     let cancelled = false;
     const token = ++pickupToken.current;
     const timer = setTimeout(() => {
-      void searchPlaces(text, pickupBias, false).then((rows) => {
+      void rankedPlaces(text, pickupBias, false).then((rows) => {
         if (!cancelled && token === pickupToken.current) setPickupHits(rows);
       });
     }, 300);
@@ -136,7 +137,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     let cancelled = false;
     const token = ++dropToken.current;
     const timer = setTimeout(() => {
-      void searchPlaces(text, pickupPoint.current, true).then((rows) => {
+      void rankedPlaces(text, pickupPoint.current, true).then((rows) => {
         if (!cancelled && token === dropToken.current) setDropHits(rows);
       });
     }, 300);
@@ -168,7 +169,11 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     setError(null);
     Keyboard.dismiss();
     keepFoundPlace(hit);
-    await applyPoint(hit.point, index, hit.label);
+    if (hit.point) await applyPoint(hit.point, index, hit.label);
+    else {
+      setStops((prev) => prev.map((stop, i) => (i === index ? { label: hit.label, point: null } : stop)));
+      forgetRoute();
+    }
   }
 
   function keepPickupTyped() {
@@ -194,7 +199,12 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     setError(null);
     Keyboard.dismiss();
     keepFoundPlace(hit);
-    await applyPoint(hit.point, "pickup", hit.label);
+    if (hit.point) await applyPoint(hit.point, "pickup", hit.label);
+    else {
+      pickupPoint.current = null;
+      setPickup(hit.label);
+      forgetRoute();
+    }
   }
 
   function focusDrop(index: number) {
@@ -818,8 +828,24 @@ function AddressField({
   );
 }
 
+async function rankedPlaces(text: string, bias: MapPoint | null, nearby: boolean): Promise<PlaceHit[]> {
+  const [local, popular] = await Promise.all([
+    searchPlaces(text, bias, nearby),
+    api.suggestAddresses(text).catch(() => []),
+  ]);
+  const used: PlaceHit[] = popular.map((row) => ({
+    point: row.lat != null && row.lng != null ? { lat: row.lat, lng: row.lng } : null,
+    label: row.label,
+    source: "used",
+    km: bias && row.lat != null && row.lng != null ? kmBetween({ lat: row.lat, lng: row.lng }, bias) : null,
+  }));
+  const usedKeys = new Set(used.map((item) => latinKey(item.label)));
+  const rest = local.filter((row) => !usedKeys.has(latinKey(row.label)));
+  return [...used, ...rest].slice(0, 8);
+}
+
 function placeCaption(hit: PlaceHit, t: (key: string) => string): string {
-  const base = hit.source === "own" ? t("create.search_own") : t("create.search_map");
+  const base = hit.source === "used" ? t("create.used") : hit.source === "own" ? t("create.search_own") : t("create.search_map");
   if (hit.km == null || !Number.isFinite(hit.km)) return base;
   const km = hit.km < 10 ? hit.km.toFixed(1) : String(Math.round(hit.km));
   return `${base} · ${km} km`;
@@ -864,9 +890,9 @@ function PlaceList({
           className={`flex-row items-center px-4 py-3 ${typed || index > 0 ? `border-t ${line}` : ""}`}
         >
           <Ionicons
-            name={hit.source === "own" ? "bookmark" : "location-outline"}
+            name={hit.source === "used" ? "star" : hit.source === "own" ? "bookmark" : "location-outline"}
             size={16}
-            color={hit.source === "own" ? "#155EEF" : "#667085"}
+            color={hit.source === "used" ? "#FF8A00" : hit.source === "own" ? "#155EEF" : "#667085"}
           />
           <View className="ml-3 flex-1">
             <Text className="text-sm text-ink" numberOfLines={1}>

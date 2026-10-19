@@ -78,6 +78,14 @@ export type DeliveryOrder = {
   updatedAt: number;
 };
 
+export type AddressUse = {
+  key: string;
+  label: string;
+  lat: number | null;
+  lng: number | null;
+  uses: number;
+};
+
 export type DeliveryRepository = {
   readUser(id: string): Promise<DeliveryUser | null>;
   readUserByPhone(phone: string, role: Role): Promise<DeliveryUser | null>;
@@ -94,6 +102,8 @@ export type DeliveryRepository = {
   insertOrder(order: DeliveryOrder): Promise<void>;
   claimPosted(id: string, courierId: string, at: number): Promise<DeliveryOrder | null>;
   saveOrderIf(expectedStatus: OrderStatus, order: DeliveryOrder): Promise<DeliveryOrder | null>;
+  bumpAddressUse(row: { key: string; label: string; lat: number | null; lng: number | null }): Promise<void>;
+  listAddressUses(limit: number): Promise<AddressUse[]>;
   transaction<T>(work: () => Promise<T>): Promise<T>;
 };
 
@@ -102,10 +112,11 @@ type FileData = {
   orders: DeliveryOrder[];
   otps: OtpRow[];
   sessions: SessionRow[];
+  addresses: AddressUse[];
 };
 
 function emptyData(): FileData {
-  return { users: [], orders: [], otps: [], sessions: [] };
+  return { users: [], orders: [], otps: [], sessions: [], addresses: [] };
 }
 
 function clone<T>(value: T): T {
@@ -120,6 +131,7 @@ export function createFileDeliveryRepository(file: string): DeliveryRepository {
   data.orders ??= [];
   data.otps ??= [];
   data.sessions ??= [];
+  data.addresses ??= [];
   let tail: Promise<void> = Promise.resolve();
   let depth = 0;
 
@@ -226,6 +238,28 @@ export function createFileDeliveryRepository(file: string): DeliveryRepository {
         data.orders[index] = clone(order);
         return clone(order);
       });
+    },
+    async bumpAddressUse(row) {
+      await gate(() => {
+        const found = data.addresses.find((item) => item.key === row.key);
+        if (found) {
+          found.uses += 1;
+          found.label = row.label;
+          if (row.lat != null && row.lng != null) {
+            found.lat = row.lat;
+            found.lng = row.lng;
+          }
+          return;
+        }
+        data.addresses.push({ ...row, uses: 1 });
+      });
+    },
+    async listAddressUses(limit) {
+      return gate(() =>
+        clone(data.addresses)
+          .sort((a, b) => b.uses - a.uses)
+          .slice(0, limit),
+      );
     },
     transaction(work) {
       return gate(work);

@@ -9,6 +9,7 @@ import {
 import { t } from "../i18n";
 import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { kmBetween } from "../services/distance";
+import { addressScore, latinKey } from "../services/uzbekAddress";
 import { sendPushNotification } from "./expoPush";
 import { setAccountNotify } from "./notifyBus";
 import { attachSignedInUser, profilePhoto, setPushToken } from "./store";
@@ -85,6 +86,35 @@ function repo(): DeliveryRepository {
 
 function fail(message: string): never {
   throw new Error(message);
+}
+
+async function rememberUsedPlaces(places: { label: string; lat?: number | null; lng?: number | null }[]) {
+  const seen = new Set<string>();
+  for (const place of places) {
+    const label = place.label.trim();
+    const key = latinKey(label);
+    if (key.length < 3 || key.startsWith("tanlangan nuqta") || seen.has(key)) continue;
+    seen.add(key);
+    const lat = typeof place.lat === "number" && Number.isFinite(place.lat) ? place.lat : null;
+    const lng = typeof place.lng === "number" && Number.isFinite(place.lng) ? place.lng : null;
+    try {
+      await repo().bumpAddressUse({ key, label, lat, lng });
+    } catch {
+      // Hisob buyurtmani to'xtatmaydi.
+    }
+  }
+}
+
+export async function suggestAddresses(query: string): Promise<{ label: string; lat: number | null; lng: number | null; uses: number }[]> {
+  const key = latinKey(query);
+  if (key.length < 2) return [];
+  const rows = await repo().listAddressUses(400);
+  return rows
+    .map((row) => ({ row, score: addressScore(key, row.key) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.row.uses - a.row.uses || b.score - a.score)
+    .slice(0, 4)
+    .map((item) => ({ label: item.row.label, lat: item.row.lat, lng: item.row.lng, uses: item.row.uses }));
 }
 
 function digits(phone: string): string {
@@ -740,6 +770,7 @@ export async function createDeliveryOrder(
     district?: string | null;
     vehicle?: VehicleKind | null;
     readyAt?: number | null;
+    dropoffs?: { label?: string; lat?: number | null; lng?: number | null }[] | null;
   },
 ): Promise<SenderOrder> {
   if (actor.role !== "sender") fail("E'lonni faqat buyurtmachi qo'yadi.");
@@ -792,6 +823,11 @@ export async function createDeliveryOrder(
   const saved = await repo().readOrder(order.id);
   if (!saved) fail("Buyurtma saqlanmadi.");
   await notifyOpenCouriers(saved);
+  await rememberUsedPlaces([
+    { label: saved.pickup, lat: saved.pickupLat, lng: saved.pickupLng },
+    { label: saved.dropoff, lat: saved.dropoffLat, lng: saved.dropoffLng },
+    ...(input.dropoffs ?? []).map((stop) => ({ label: stop.label ?? "", lat: stop.lat, lng: stop.lng })),
+  ]);
   return senderView(saved, null);
 }
 
@@ -844,6 +880,10 @@ export async function updateDelivery(
     };
     const saved = await store.saveOrderIf("posted", next);
     if (!saved) fail("Holat o'zgarmadi.");
+    await rememberUsedPlaces([
+      { label: saved.pickup, lat: saved.pickupLat, lng: saved.pickupLng },
+      { label: saved.dropoff, lat: saved.dropoffLat, lng: saved.dropoffLng },
+    ]);
     return senderView(saved, null);
   });
 }

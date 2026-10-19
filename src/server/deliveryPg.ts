@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { OrderStatus, Role } from "../types";
-import type { DeliveryOrder, DeliveryRepository, DeliveryUser, OtpRow, SessionRow } from "./deliveryRepo";
+import type { AddressUse, DeliveryOrder, DeliveryRepository, DeliveryUser, OtpRow, SessionRow } from "./deliveryRepo";
 import { markDeliveryDatabaseReady, setDeliveryDatabaseReason, useDeliveryRepository } from "./deliveryService";
 
 type Queryable = {
@@ -199,6 +199,37 @@ class PgDeliveryRepository implements DeliveryRepository {
     );
     const row = result.rows[0];
     return row ? asOrder(row.body) : null;
+  }
+
+  async bumpAddressUse(row: { key: string; label: string; lat: number | null; lng: number | null }): Promise<void> {
+    await this.db().query(
+      `insert into public.eg_address_uses (key, label, lat, lng, uses, updated_at)
+       values ($1, $2, $3, $4, 1, $5)
+       on conflict (key) do update set
+         uses = public.eg_address_uses.uses + 1,
+         label = excluded.label,
+         lat = coalesce(excluded.lat, public.eg_address_uses.lat),
+         lng = coalesce(excluded.lng, public.eg_address_uses.lng),
+         updated_at = excluded.updated_at`,
+      [row.key, row.label, row.lat, row.lng, Date.now()],
+    );
+  }
+
+  async listAddressUses(limit: number): Promise<AddressUse[]> {
+    const result = await this.db().query(
+      `select key, label, lat, lng, uses
+       from public.eg_address_uses
+       order by uses desc, updated_at desc
+       limit $1`,
+      [limit],
+    );
+    return result.rows.map((row) => ({
+      key: String(row.key),
+      label: String(row.label),
+      lat: row.lat == null ? null : Number(row.lat),
+      lng: row.lng == null ? null : Number(row.lng),
+      uses: Number(row.uses),
+    }));
   }
 }
 

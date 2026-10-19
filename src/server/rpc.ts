@@ -52,6 +52,7 @@ export const RPC = {
   ) => delivery.reviewDoc(requireActor(), courierId, kind, ok, note),
   createOrder: (input: Parameters<typeof delivery.createDeliveryOrder>[1]) =>
     delivery.createDeliveryOrder(requireActor(), input),
+  suggestAddresses: (query: string) => delivery.suggestAddresses(query),
   updateOrder: (_senderId: string, orderId: string, input: Parameters<typeof delivery.updateDelivery>[2]) =>
     delivery.updateDelivery(requireActor(), orderId, input),
   listSenderOrders: (_senderId: string) => delivery.listMine(requireActor()),

@@ -84,6 +84,7 @@ const SHARED_RPC = new Set([
   "submitCourierDoc",
   "reviewCourierDoc",
   "createOrder",
+  "suggestAddresses",
   "updateOrder",
   "listSenderOrders",
   "cancelOrder",
@@ -223,6 +224,9 @@ export const api = {
     return invoke("reviewCourierDoc", [courierId, kind, ok, note], () =>
       server.reviewCourierDoc(courierId, kind, ok, note),
     );
+  },
+  suggestAddresses(query: string): Promise<{ label: string; lat: number | null; lng: number | null; uses: number }[]> {
+    return invoke("suggestAddresses", [query], () => []);
   },
   createOrder(input: {
     senderId: string;

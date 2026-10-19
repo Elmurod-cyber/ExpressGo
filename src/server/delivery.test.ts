@@ -14,6 +14,7 @@ import {
   declineDelivery,
   cancelDelivery,
   createDeliveryOrder,
+  suggestAddresses,
   creditAsAdmin,
   deliverDelivery,
   deliveryDatabaseStatus,
@@ -395,6 +396,19 @@ test("smenasi ochiq kuryerga yopiq ilova xabari boradi", async () => {
   } finally {
     setExpoPushSender(null);
   }
+});
+
+test("eng ko'p yuborilgan manzil birinchi taklif qilinadi", async () => {
+  useTempRepo();
+  const sender = await signIn("sender", "998900000077", "Ali");
+  const actor = actorOf(sender.account);
+  const base = { item: "Hujjat", customerPhone: "998900000009", vehicle: "walk" as const, deliveryFee: 20000 };
+  await createDeliveryOrder(actor, { ...base, pickup: "Asaka", dropoff: "Bozor", pickupLat: 40.64, pickupLng: 72.23 });
+  await createDeliveryOrder(actor, { ...base, pickup: "Shahrixon markaz", dropoff: "Bozor", pickupLat: 40.71, pickupLng: 72.05 });
+  await createDeliveryOrder(actor, { ...base, pickup: "Шаҳрихон марказ", dropoff: "Bozor", pickupLat: 40.712, pickupLng: 72.057 });
+  const rows = await suggestAddresses("shahrix");
+  assert.equal(rows[0]?.label, "Шаҳрихон марказ");
+  assert.ok((rows[0]?.uses ?? 0) >= 2);
 });
 
 test("sinov hisobi HTTP orqali ham ochilmaydi", async () => {
