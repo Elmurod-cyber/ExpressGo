@@ -21,6 +21,9 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
     ? { name: account.name, phone: account.phone, token: getSessionToken() }
     : null;
   const [placeId, setPlaceId] = useState<string | null>(null);
+  const [find, setFind] = useState("");
+  const [findOn, setFindOn] = useState(false);
+  const findRef = useRef<TextInput>(null);
   const [profileReady, setProfileReady] = useState(false);
   const [cart, setCart] = useState<FoodCartSnap>({ restaurantId: "", items: {} });
   const [openCart, setOpenCart] = useState(false);
@@ -67,6 +70,14 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
       />
     );
   }
+  const needle = find.trim().toLowerCase();
+  const places = needle
+    ? FOOD_PLACES.filter(
+        (item) =>
+          item.name.toLowerCase().includes(needle) ||
+          item.dishes.some((dish) => t(dish.nameKey).toLowerCase().includes(needle)),
+      )
+    : FOOD_PLACES;
 
   return (
     <Screen compact>
@@ -81,8 +92,40 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
             setOpenCart(true);
           }}
         />
+        <Pressable
+          onPress={() => findRef.current?.focus()}
+          accessibilityRole="search"
+          className="mt-4 flex-row items-center rounded-2xl border border-line bg-card px-3"
+        >
+          <Ionicons name="search" size={18} color="#98A2B3" />
+          <TextInput
+            ref={findRef}
+            value={find}
+            onChangeText={setFind}
+            onFocus={() => setFindOn(true)}
+            onBlur={() => setFindOn(false)}
+            placeholder={findOn ? "" : t("food.find")}
+            placeholderTextColor="#98A2B3"
+            returnKeyType="search"
+            className="ml-2 h-12 flex-1 bg-transparent text-base text-ink"
+          />
+          {find.trim() ? (
+            <Pressable
+              onPress={() => {
+                setFind("");
+                findRef.current?.focus();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("cancel")}
+              className="h-8 w-8 items-center justify-center"
+            >
+              <Ionicons name="close" size={16} color="#98A2B3" />
+            </Pressable>
+          ) : null}
+        </Pressable>
         {customer ? <FoodMine token={customer.token} onExpired={() => onNeedAccount?.()} /> : null}
-        {FOOD_PLACES.map((item) => (
+        {places.length === 0 ? <Text className="mt-4 text-sm text-muted">{t("food.find_empty")}</Text> : null}
+        {places.map((item) => (
           <Pressable
             key={item.id}
             onPress={() => setPlaceId(item.id)}
