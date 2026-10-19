@@ -403,13 +403,56 @@ export async function saveProfile(
   const phone = digits(input.phone ?? user.phone);
   if (name.length < 2) fail("Ismingizni yozing.");
   if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
-  const taken = (await repo().listUsers()).find((item) => item.id !== user.id && item.role === user.role && digits(item.phone) === phone);
-  if (taken) fail("Bu telefon bilan boshqa hisob bor.");
+  if (phone !== digits(user.phone)) fail("Telefon raqamini tasdiqlash kodi bilan almashtiring.");
   user.name = name;
-  user.phone = phone;
+  user.phone = digits(user.phone);
   if (input.photo !== undefined) user.photo = profilePhoto(input.photo);
   user.updatedAt = Date.now();
   await repo().writeUser(user);
+  attachSignedInUser({ id: user.id, role: user.role, name: user.name, phone: user.phone });
+  return toAccount(user);
+}
+
+export async function requestPhoneChange(actor: Actor, phone: string): Promise<OtpChallenge> {
+  const next = digits(phone);
+  if (next.length < 9) fail("Telefon raqamini to'liq yozing.");
+  const user = await repo().readUser(actor.id);
+  if (!user) fail("Hisob topilmadi.");
+  if (next === digits(user.phone)) fail("Bu hozirgi raqamingiz.");
+  const taken = (await repo().listUsers()).find((item) => item.id !== user.id && item.role === user.role && digits(item.phone) === next);
+  if (taken) fail("Bu telefon bilan boshqa hisob bor.");
+  const test = smsTestMode();
+  const code = test ? SMS_TEST_CODE : String(randomInt(1000, 10000));
+  const until = Date.now() + OTP_MS;
+  if (!test) await sendLoginCode(next, code);
+  await repo().writeOtp({ phone: next, role: user.role, codeHash: sha256(code), expiresAt: until, tries: 0 });
+  return test ? { phone: next, until, testCode: SMS_TEST_CODE } : { phone: next, until };
+}
+
+export async function confirmPhoneChange(actor: Actor, input: { phone: string; code: string; name?: string }): Promise<Account> {
+  const user = await repo().readUser(actor.id);
+  if (!user) fail("Hisob topilmadi.");
+  const next = digits(input.phone);
+  const typed = input.code.replace(/\D/g, "");
+  const row = await repo().readOtp(next, user.role);
+  if (!row) fail("Avval kodni yuboring.");
+  if (Date.now() > row.expiresAt) fail("Kod muddati tugadi. Qayta yuboring.");
+  if (row.tries >= OTP_TRIES) fail("Kod noto'g'ri. Qayta yuboring.");
+  if (!sameHash(sha256(typed), row.codeHash)) {
+    row.tries += 1;
+    await repo().writeOtp(row);
+    fail("Kod noto'g'ri.");
+  }
+  const taken = (await repo().listUsers()).find((item) => item.id !== user.id && item.role === user.role && digits(item.phone) === next);
+  if (taken) fail("Bu telefon bilan boshqa hisob bor.");
+  const name = (input.name ?? user.name).trim();
+  if (name.length < 2) fail("Ismingizni yozing.");
+  user.name = name;
+  user.phone = next;
+  user.phoneVerified = true;
+  user.updatedAt = Date.now();
+  await repo().writeUser(user);
+  await repo().deleteOtp(next, user.role);
   attachSignedInUser({ id: user.id, role: user.role, name: user.name, phone: user.phone });
   return toAccount(user);
 }

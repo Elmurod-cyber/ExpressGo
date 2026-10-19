@@ -149,6 +149,16 @@ export const api = {
   updateProfile(userId: string, input: { name?: string; phone?: string; photo?: string | null }): Promise<Account> {
     return invoke("updateProfile", [userId, input], () => server.updateProfile(userId, input));
   },
+  requestPhoneChange(phone: string): Promise<OtpChallenge> {
+    return invoke("requestPhoneChange", [phone], () => {
+      throw new Error("Telefonni almashtirish uchun server kerak.");
+    });
+  },
+  confirmPhoneChange(input: { phone: string; code: string; name?: string }): Promise<Account> {
+    return invoke("confirmPhoneChange", [input], () => {
+      throw new Error("Telefonni almashtirish uchun server kerak.");
+    });
+  },
   setPushToken(userId: string, token: string): Promise<void> {
     return invoke("setPushToken", [userId, token], () => server.setPushToken(userId, token));
   },

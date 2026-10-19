@@ -8,6 +8,7 @@ import { AdminEntry } from "./DemoDock";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import { useNight } from "../services/theme";
+import type { OtpChallenge } from "../types";
 
 export function ProfilePanel({
   onBack,
@@ -226,18 +227,40 @@ function EditProfile({
   const night = useNight();
   const [draftName, setDraftName] = useState(name);
   const [draftPhone, setDraftPhone] = useState(phone);
+  const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const phoneChanged = draftPhone.replace(/\D/g, "") !== phone.replace(/\D/g, "");
 
   async function save() {
     if (!account || busy) return;
     setBusy(true);
     setError(null);
     try {
-      replaceAccount(await api.updateProfile(account.id, { name: draftName, phone: draftPhone }));
-      onSaved();
+      if (!phoneChanged) {
+        replaceAccount(await api.updateProfile(account.id, { name: draftName }));
+        onSaved();
+        return;
+      }
+      setChallenge(await api.requestPhoneChange(draftPhone));
+      setCode("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("saved_fail"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm() {
+    if (!challenge || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      replaceAccount(await api.confirmPhoneChange({ phone: challenge.phone, code, name: draftName }));
+      onSaved();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t("otp.fail"));
       setBusy(false);
     }
   }
@@ -262,22 +285,50 @@ function EditProfile({
       <Text className="mb-1 mt-3 text-xs font-medium text-muted">{t("auth.phone")}</Text>
       <TextInput
         value={draftPhone}
-        onChangeText={(value) => setDraftPhone((prev) => editUzPhone(value, prev))}
+        onChangeText={(value) => {
+          setChallenge(null);
+          setDraftPhone((prev) => editUzPhone(value, prev));
+        }}
         placeholder="+998"
         placeholderTextColor="#98A2B3"
         keyboardType="phone-pad"
+        editable={!challenge}
         className="h-12 rounded-xl border border-line bg-card px-3 text-base text-ink"
       />
+      <Text className="mt-2 text-xs text-muted">{t("profile.phone_hint")}</Text>
+      {challenge ? (
+        <View className="mt-4">
+          <Text className="text-sm font-semibold text-ink">{t("otp.title")}</Text>
+          <Text className="mt-1 text-xs text-muted">
+            {challenge.testCode ? t("otp.test_hint", { code: challenge.testCode }) : t("otp.body", { phone: formatUzPhone(challenge.phone) })}
+          </Text>
+          <TextInput
+            value={code}
+            onChangeText={(value) => setCode(value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="0000"
+            placeholderTextColor="#98A2B3"
+            keyboardType="number-pad"
+            className="mt-2 h-12 rounded-xl border border-line bg-card px-3 text-base text-ink"
+          />
+        </View>
+      ) : null}
       {error ? <Text className="mt-2 text-xs text-red-600">{error}</Text> : null}
       <View className="mt-auto pt-6">
         <Pressable
-          onPress={() => void save()}
-          disabled={busy}
+          onPress={() => void (challenge ? confirm() : save())}
+          disabled={busy || (challenge ? code.length < 4 : false)}
           accessibilityRole="button"
-          className={`h-12 items-center justify-center rounded-xl ${busy ? "bg-slate-200" : "bg-[#FF8A00] active:opacity-90"}`}
+          className={`h-12 items-center justify-center rounded-xl ${busy || (challenge && code.length < 4) ? "bg-slate-200" : "bg-[#FF8A00] active:opacity-90"}`}
         >
-          <Text className={`text-base font-bold ${busy ? "text-slate-500" : "text-[#171717]"}`}>{busy ? t("saving") : t("save")}</Text>
+          <Text className={`text-base font-bold ${busy || (challenge && code.length < 4) ? "text-slate-500" : "text-[#171717]"}`}>
+            {busy ? t("saving") : challenge ? t("otp.ok") : phoneChanged ? t("otp.title") : t("save")}
+          </Text>
         </Pressable>
+        {challenge ? (
+          <Pressable onPress={() => void save()} disabled={busy} accessibilityRole="button" className="mt-2 items-center py-2">
+            <Text className="text-sm font-semibold text-ink">{t("otp.resend")}</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={onCancel}
           accessibilityRole="button"

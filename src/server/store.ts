@@ -1923,10 +1923,7 @@ export function updateProfile(userId: string, input: { name?: string; phone?: st
   if (phone.length < 9) {
     fail("Telefon raqamini to'liq yozing.");
   }
-  const taken = users.find((item) => item.id !== user.id && item.role === user.role && item.phone === phone);
-  if (taken) {
-    fail("Bu telefon bilan boshqa hisob bor.");
-  }
+  if (phone !== user.phone) fail("Telefon raqamini tasdiqlash kodi bilan almashtiring.");
   const oldPhone = user.phone;
   user.name = name;
   user.phone = phone;
