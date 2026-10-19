@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useT } from "../context/Session";
+import { useNight } from "../services/theme";
 
 export function FoodHeader({
   title,
@@ -14,6 +15,7 @@ export function FoodHeader({
   onCart: () => void;
 }) {
   const t = useT();
+  const night = useNight();
   return (
     <View className="mb-3 flex-row items-center">
       <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t("food.back")} className="h-10 w-10 items-center justify-center">
@@ -28,7 +30,7 @@ export function FoodHeader({
         accessibilityLabel={cartCount > 0 ? `${t("food.cart")}, ${cartCount}` : t("food.cart")}
         className="h-10 w-10 items-center justify-center"
       >
-        <Ionicons name="cart-outline" size={26} color="#121212" />
+        <Ionicons name="cart-outline" size={26} color={night ? "#F4F6FB" : "#121212"} />
         {cartCount > 0 ? (
           <View className="absolute right-0 top-0 h-5 min-w-5 items-center justify-center rounded-full bg-[#C2410C] px-1">
             <Text className="text-[11px] font-bold text-white">{cartCount}</Text>

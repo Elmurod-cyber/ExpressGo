@@ -19,7 +19,6 @@ import { ProfilePanel } from "../components/ProfilePanel";
 import { useInbox } from "../hooks/useInbox";
 import { HistoryStats } from "../components/HistoryStats";
 import { ChatBox } from "../components/ChatBox";
-import { AdminEntry } from "../components/DemoDock";
 import { SenderTabBar, type SenderPage } from "../components/SenderTabBar";
 import { KitchenPanel } from "../components/FoodBoard";
 
@@ -606,10 +605,9 @@ function SenderChat({
 
 function SenderProfile() {
   return (
-    <Screen compact>
-      <View className="px-4 pt-3">
-        <ProfilePanel />
-        <AdminEntry />
+    <Screen scroll={false}>
+      <View className="min-h-0 flex-1 px-4 pb-3 pt-3">
+        <ProfilePanel docked />
       </View>
     </Screen>
   );

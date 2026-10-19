@@ -8,6 +8,7 @@ import { readFoodCart, saveFoodCartSnap, type FoodCartSnap, type FoodProfile } f
 import { getSessionToken } from "../services/sessionToken";
 import { FOOD_PLACES, type FoodDish, type FoodPlace } from "../data/foodPlaces";
 import { formatMoney } from "../services/money";
+import { useNight } from "../services/theme";
 import { formatUzPhone } from "../services/phoneMask";
 import { useSession, useT } from "../context/Session";
 import type { FoodTicket, KitchenDesk } from "../types";
@@ -403,6 +404,7 @@ function PlaceMenu({
 
 function DishRow({ dish, qty, onChange }: { dish: FoodDish; qty: number; onChange: (next: number) => void }) {
   const t = useT();
+  const night = useNight();
   return (
     <View className="mt-2 flex-row items-center rounded-3xl bg-card p-3">
       <Image source={dish.image} style={{ width: 84, height: 84, borderRadius: 20 }} resizeMode="cover" />
@@ -419,9 +421,9 @@ function DishRow({ dish, qty, onChange }: { dish: FoodDish; qty: number; onChang
         <Pressable
           onPress={() => onChange(1)}
           accessibilityRole="button"
-          className="h-10 w-10 items-center justify-center rounded-full bg-[#121212] active:opacity-90"
+          className={`h-10 w-10 items-center justify-center rounded-full active:opacity-90 ${night ? "bg-[#FF8A00]" : "bg-[#121212]"}`}
         >
-          <Ionicons name="add" size={22} color="#FFFFFF" />
+          <Ionicons name="add" size={22} color={night ? "#171717" : "#FFFFFF"} />
         </Pressable>
       )}
     </View>
@@ -429,14 +431,16 @@ function DishRow({ dish, qty, onChange }: { dish: FoodDish; qty: number; onChang
 }
 
 function Qty({ qty, onChange }: { qty: number; onChange: (next: number) => void }) {
+  const night = useNight();
+  const mark = night ? "#FFB067" : "#C2410C";
   return (
-    <View className="flex-row items-center rounded-full bg-[#FFF7ED] px-1 py-1">
+    <View className={`flex-row items-center rounded-full px-1 py-1 ${night ? "border border-[#5C3A24] bg-[#3A2A1C]" : "bg-[#FFF7ED]"}`}>
       <Pressable onPress={() => onChange(qty - 1)} accessibilityRole="button" className="h-8 w-8 items-center justify-center">
-        <Ionicons name="remove" size={16} color="#C2410C" />
+        <Ionicons name="remove" size={16} color={mark} />
       </Pressable>
-      <Text className="min-w-[18px] text-center text-sm font-bold text-ink">{qty}</Text>
+      <Text className={`min-w-[18px] text-center text-sm font-bold ${night ? "text-[#F4F6FB]" : "text-[#171717]"}`}>{qty}</Text>
       <Pressable onPress={() => onChange(qty + 1)} accessibilityRole="button" className="h-8 w-8 items-center justify-center">
-        <Ionicons name="add" size={16} color="#C2410C" />
+        <Ionicons name="add" size={16} color={mark} />
       </Pressable>
     </View>
   );

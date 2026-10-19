@@ -4,14 +4,14 @@ import { useSession } from "../context/Session";
 
 export type AppDock = "sender" | "courier" | "admin";
 
-export function AdminEntry() {
+export function AdminEntry({ grouped = false }: { grouped?: boolean }) {
   const { account, setDock, t } = useSession();
   if (!account?.isAdmin) return null;
   return (
     <Pressable
       onPress={() => setDock("admin")}
       accessibilityRole="button"
-      className="mt-3 flex-row items-center rounded-3xl bg-card px-3 py-2.5 active:opacity-90"
+      className={`flex-row items-center active:opacity-90 ${grouped ? "border-t border-line px-4 py-3" : "mt-3 rounded-3xl bg-card px-3 py-2.5"}`}
     >
       <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-soft">
         <Ionicons name="grid" size={18} color="#155EEF" />

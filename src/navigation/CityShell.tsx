@@ -3,7 +3,6 @@ import { Pressable, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { CityTabBar, type CityTab } from "../components/CityTabBar";
 import { ProfilePanel } from "../components/ProfilePanel";
-import { AdminEntry } from "../components/DemoDock";
 import { useSession, useT } from "../context/Session";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
@@ -77,10 +76,9 @@ function AccountProfile({ onCancel }: { onCancel: () => void }) {
   const { account } = useSession();
   if (!account) return <RegisterScreen role="sender" onBack={onCancel} />;
   return (
-    <Screen compact>
-      <View className="px-4 pb-6 pt-3">
-        <ProfilePanel />
-        <AdminEntry />
+    <Screen scroll={false}>
+      <View className="min-h-0 flex-1 px-4 pb-3 pt-3">
+        <ProfilePanel onBack={onCancel} docked />
       </View>
     </Screen>
   );
