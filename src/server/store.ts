@@ -457,7 +457,135 @@ type FoodTicketRecord = {
   status: FoodTicketStatus;
   orderId: string | null;
   at: number;
+  closedAt?: number | null;
 };
+
+const FOOD_HISTORY_MS = 12 * 60 * 60 * 1000;
+const FOOD_OPEN = new Set<FoodTicketStatus>(["new", "accepted", "preparing", "ready"]);
+
+function foodIsDone(status: FoodTicketStatus): boolean {
+  return status === "rejected" || status === "sent" || status === "cancelled";
+}
+
+function stampFoodClosed(row: FoodTicketRecord) {
+  if (foodIsDone(row.status)) {
+    if (!row.closedAt) row.closedAt = Date.now();
+  } else row.closedAt = null;
+}
+
+function foodBody(row: FoodTicketRecord): Record<string, unknown> {
+  return {
+    placeName: row.placeName,
+    pickup: row.pickup,
+    staffPhone: row.staffPhone,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
+    dropoff: row.dropoff,
+    handoff: row.handoff === "pickup" ? "pickup" : "courier",
+    lines: row.lines,
+    foodTotal: row.foodTotal,
+    status: row.status,
+    orderId: row.orderId,
+    at: row.at,
+    closedAt: row.closedAt ?? null,
+  };
+}
+
+function syncFoodTicket(row: FoodTicketRecord) {
+  stampFoodClosed(row);
+  void persistFoodOrder({
+    phone: row.customerPhone,
+    name: row.customerName,
+    restaurantId: row.placeId,
+    ticketId: row.id,
+    address: row.dropoff,
+    body: foodBody(row),
+  }).catch(() => undefined);
+}
+
+function foodStillListed(row: FoodTicketRecord, now = Date.now()): boolean {
+  if (FOOD_OPEN.has(row.status)) return true;
+  const closed = row.closedAt ?? row.at;
+  return now - closed < FOOD_HISTORY_MS;
+}
+
+export type FoodOrderLoad = {
+  ticketId: string;
+  restaurantId: string;
+  phone: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  body: Record<string, unknown>;
+};
+
+function foodLines(raw: unknown): FoodTicketRecord["lines"] | null {
+  if (!Array.isArray(raw)) return null;
+  const lines = raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const line = item as { name?: unknown; qty?: unknown; price?: unknown };
+      const name = typeof line.name === "string" ? line.name.trim() : "";
+      const qty = Math.round(Number(line.qty));
+      const price = Math.round(Number(line.price));
+      if (!name || qty < 1 || price < 1) return null;
+      return { name, qty, price };
+    })
+    .filter((line): line is { name: string; qty: number; price: number } => line != null);
+  return lines.length > 0 ? lines : null;
+}
+
+function ticketFromLoad(load: FoodOrderLoad): FoodTicketRecord | null {
+  const body = load.body;
+  const status = body.status;
+  if (typeof status !== "string" || (!FOOD_OPEN.has(status as FoodTicketStatus) && !foodIsDone(status as FoodTicketStatus))) return null;
+  const foodStatus = status as FoodTicketStatus;
+  const lines = foodLines(body.lines);
+  if (!lines) return null;
+  const placeName = typeof body.placeName === "string" ? body.placeName.trim() : "";
+  const pickup = typeof body.pickup === "string" ? body.pickup.trim() : "";
+  if (placeName.length < 2 || pickup.length < 2) return null;
+  const at = typeof body.at === "number" && Number.isFinite(body.at) ? body.at : load.createdAt;
+  const closedRaw = body.closedAt;
+  const closedAt =
+    typeof closedRaw === "number" && Number.isFinite(closedRaw)
+      ? closedRaw
+      : foodIsDone(foodStatus)
+        ? load.updatedAt
+        : null;
+  const customerPhone = phoneKey(typeof body.customerPhone === "string" && body.customerPhone ? body.customerPhone : load.phone);
+  if (customerPhone.length < 9) return null;
+  return {
+    id: load.ticketId,
+    placeId: load.restaurantId,
+    placeName,
+    pickup,
+    staffPhone: phoneKey(typeof body.staffPhone === "string" ? body.staffPhone : ""),
+    customerName: (typeof body.customerName === "string" && body.customerName.trim()) || load.name || "Mijoz",
+    customerPhone,
+    dropoff: typeof body.dropoff === "string" && body.dropoff.trim() ? body.dropoff.trim() : pickup,
+    handoff: body.handoff === "pickup" ? "pickup" : "courier",
+    lines,
+    foodTotal: typeof body.foodTotal === "number" && Number.isFinite(body.foodTotal) ? body.foodTotal : lines.reduce((sum, line) => sum + line.qty * line.price, 0),
+    status: foodStatus,
+    orderId: typeof body.orderId === "string" && body.orderId ? body.orderId : null,
+    at,
+    closedAt,
+  };
+}
+
+/** Server ochilganda bazadagi jonli buyurtmalar xotira ro'yxatini almashtiradi. */
+export function adoptFoodOrders(loads: FoodOrderLoad[], maxSeq: number): number {
+  if (maxSeq > foodSeq) foodSeq = maxSeq;
+  const next: FoodTicketRecord[] = [];
+  for (const load of loads) {
+    const row = ticketFromLoad(load);
+    if (row) next.push(row);
+  }
+  foodTickets.length = 0;
+  for (const row of next) foodTickets.push(row);
+  return foodTickets.length;
+}
 
 type BuilderRating = { phone: string; stars: number };
 
@@ -2358,22 +2486,7 @@ export async function placeFoodOrder(input: {
     at: Date.now(),
   };
   foodTickets.unshift(row);
-  void persistFoodOrder({
-    phone,
-    name,
-    restaurantId: placeId,
-    ticketId: row.id,
-    address: dropoff,
-    body: {
-      placeName,
-      pickup,
-      dropoff,
-      handoff,
-      lines,
-      foodTotal: row.foodTotal,
-      status: row.status,
-    },
-  }).catch(() => undefined);
+  syncFoodTicket(row);
   void persistFoodCart(phone, name, placeId, []).catch(() => undefined);
   notifyFoodOrder({
     ticketId: row.id,
@@ -2513,6 +2626,7 @@ export async function sendKitchenToCourier(userId: string, ticketId: string): Pr
   });
   row.status = "sent";
   row.orderId = order.id;
+  syncFoodTicket(row);
   return toFoodTicket(row);
 }
 
@@ -2535,7 +2649,7 @@ function ownFood(guestToken: string, ticketId: string): FoodTicketRecord {
 export function listMyFood(guestToken: string): FoodTicket[] {
   const session = requireGuest(guestToken, "food");
   return foodTickets
-    .filter((row) => samePhone(row.customerPhone, session.phone))
+    .filter((row) => samePhone(row.customerPhone, session.phone) && foodStillListed(row))
     .sort((a, b) => b.at - a.at)
     .map(toFoodTicket);
 }
@@ -2566,6 +2680,7 @@ export function updateMyFood(
     row.lines = next;
     row.foodTotal = next.reduce((sum, line) => sum + line.qty * line.price, 0);
   }
+  syncFoodTicket(row);
   return toFoodTicket(row);
 }
 
@@ -2573,6 +2688,7 @@ export function cancelMyFood(guestToken: string, ticketId: string): FoodTicket {
   const row = ownFood(guestToken, ticketId);
   if (row.status !== "new") fail("Restoran qabul qilgan. Bekor yopiq.");
   row.status = "cancelled";
+  syncFoodTicket(row);
   return toFoodTicket(row);
 }
 
@@ -2700,6 +2816,7 @@ function moveFoodStatus(row: FoodTicketRecord, status: FoodTicketStatus) {
     (row.status === "preparing" && status === "ready");
   if (!allowed) fail("Bu holatga o'tib bo'lmaydi.");
   row.status = status;
+  syncFoodTicket(row);
 }
 
 function toFoodTicket(row: FoodTicketRecord): FoodTicket {

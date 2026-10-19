@@ -11,6 +11,7 @@ import {
   requestGuestCode,
   updateMyFood,
   verifyGuestCode,
+  adoptFoodOrders,
 } from "./store";
 import { readDevOtp } from "./sms";
 import { sha256 } from "./sha256";
@@ -128,4 +129,43 @@ test("taom zakazi tasdiqlangan telefonga yoziladi va yangisigina tahrirlanadi", 
   assert.throws(() => updateMyFood(food.token, ticket.id, { dropoff: "Yana" }));
   const mine = listMyFood(food.token);
   assert.equal(mine.some((item) => item.id === ticket.id), true);
+});
+
+test("tugagan taom 12 soatdan keyin ekrandan chiqadi, ochig'i qoladi", async () => {
+  const food = await pass("food", "998900000066", "Lola");
+  const hour = 60 * 60 * 1000;
+  const now = Date.now();
+  function load(id: string, status: "cancelled" | "preparing", ageHours: number, closedHours: number | null) {
+    return {
+      ticketId: id,
+      restaurantId: "demo",
+      phone: "998900000066",
+      name: "Lola",
+      createdAt: now - ageHours * hour,
+      updatedAt: now - (closedHours ?? ageHours) * hour,
+      body: {
+        placeName: "Burger",
+        pickup: "Markaz",
+        staffPhone: "998900000088",
+        customerName: "Lola",
+        customerPhone: "998900000066",
+        dropoff: "Uy",
+        handoff: "courier",
+        lines: [{ name: "Lavash", qty: 1, price: 1000 }],
+        foodTotal: 1000,
+        status,
+        orderId: null,
+        at: now - ageHours * hour,
+        closedAt: closedHours == null ? null : now - closedHours * hour,
+      },
+    };
+  }
+  adoptFoodOrders(
+    [load("f9001", "cancelled", 20, 13), load("f9002", "cancelled", 3, 1), load("f9003", "preparing", 30, null)],
+    9003,
+  );
+  const mine = listMyFood(food.token);
+  assert.equal(mine.some((item) => item.id === "f9001"), false);
+  assert.equal(mine.some((item) => item.id === "f9002"), true);
+  assert.equal(mine.some((item) => item.id === "f9003"), true);
 });

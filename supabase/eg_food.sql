@@ -28,8 +28,11 @@ create table if not exists public.eg_food_orders (
   restaurant_id text not null,
   ticket_id text not null,
   body jsonb not null,
-  created_at timestamptz not null default timezone('utc', now())
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
 );
+
+create unique index if not exists eg_food_orders_ticket_id_uid on public.eg_food_orders (ticket_id);
 
 alter table public.eg_food_users enable row level security;
 alter table public.eg_food_cart enable row level security;

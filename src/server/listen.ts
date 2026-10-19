@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { networkInterfaces } from "node:os";
-import { exportSnapshot, importSnapshot, useConstructionRepository, useTripRepository } from "./store";
+import { adoptFoodOrders, exportSnapshot, importSnapshot, useConstructionRepository, useTripRepository } from "./store";
 import { connectDeliveryDatabase } from "./deliveryPg";
 import { connectTripDatabase, tripRepository } from "./tripDb";
 import { connectConstructionDatabase, constructionRepository } from "./constructionDb";
-import { connectFoodDatabase, saveFoodCartRows, saveFoodOrderRow, saveFoodUserRow } from "./foodDb";
+import { connectFoodDatabase, listFoodOrdersForBoot, saveFoodCartRows, saveFoodOrderRow, saveFoodUserRow } from "./foodDb";
 import { setFoodNotify, setFoodPersist } from "./foodPersist";
 import { armTelegram, notifyKitchen } from "./partner";
 import { createRpcServer } from "./rpcHttp";
@@ -89,7 +89,9 @@ void (async () => {
   const food = await connectFoodDatabase();
   if (food.ok) {
     setFoodPersist({ saveUser: saveFoodUserRow, saveCart: saveFoodCartRows, saveOrder: saveFoodOrderRow });
-    console.log("Taom jadvali ulangan.");
+    const loaded = await listFoodOrdersForBoot();
+    const count = adoptFoodOrders(loaded.orders, loaded.maxSeq);
+    console.log(`Taom jadvali ulangan. Buyurtmalar: ${count}.`);
   } else console.warn(food.reason);
   setFoodNotify((info) => {
     void notifyKitchen(info);
