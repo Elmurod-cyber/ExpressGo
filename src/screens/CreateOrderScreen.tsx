@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Keyboard, Pressable, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { MapPicker, type MapPickerHandle } from "../components/MapPicker";
@@ -45,6 +46,7 @@ function editReceiverPhone(next: string, prev: string): string {
 export function CreateOrderScreen({ onDone, mode = "create", draft = null }: CreateOrderScreenProps) {
   const { account, t } = useSession();
   const night = useNight();
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<MapPickerHandle>(null);
   const pickupPoint = useRef<MapPoint | null>(null);
   const [query, setQuery] = useState("");
@@ -395,7 +397,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
 
   return (
     <Screen>
-      <View className="px-4 pt-3">
+      <View className="px-4 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 28) + 16 }}>
         <View className="flex-row items-center">
           <BrandMark />
           <View className="ml-3 h-11 flex-1 flex-row items-center rounded-full bg-card px-3">
