@@ -9,6 +9,14 @@ import { createRpcServer } from "./rpcHttp";
 import { createFileDeliveryRepository } from "./deliveryRepo";
 import {
   acceptDelivery,
+  attachLoginChat,
+  authMethod,
+  beginPasswordReset,
+  beginTelegramSignup,
+  confirmLoginContact,
+  finishPasswordReset,
+  finishTelegramSignup,
+  loginWithPassword,
   adminBoard,
   courierBoard,
   declineDelivery,
@@ -409,6 +417,39 @@ test("eng ko'p yuborilgan manzil birinchi taklif qilinadi", async () => {
   const rows = await suggestAddresses("shahrix");
   assert.equal(rows[0]?.label, "Шаҳрихон марказ");
   assert.ok((rows[0]?.uses ?? 0) >= 2);
+});
+
+test("telegram raqami mos kelsa parol bilan kiriladi", async () => {
+  useTempRepo();
+  const prevToken = process.env.TELEGRAM_LOGIN_BOT_TOKEN;
+  const prevName = process.env.TELEGRAM_LOGIN_BOT_USERNAME;
+  process.env.TELEGRAM_LOGIN_BOT_TOKEN = "test-token";
+  process.env.TELEGRAM_LOGIN_BOT_USERNAME = "ExpressGoLoginBot";
+  try {
+    assert.equal(authMethod().mode, "telegram");
+    const challenge = await beginTelegramSignup({ role: "sender", name: "Lola", phone: "998900000081" });
+    assert.equal(await attachLoginChat(challenge.id, 42), true);
+    assert.equal(await confirmLoginContact(42, "998900000099", true), "mismatch");
+    assert.equal(await confirmLoginContact(42, "+998900000081", false), "mismatch");
+    assert.equal(await confirmLoginContact(42, "+998 90 000 00 81", true), "ok");
+    const session = await finishTelegramSignup({ id: challenge.id, password: "sir123" });
+    assert.equal(session.account.name, "Lola");
+    await assert.rejects(() => loginWithPassword({ role: "sender", phone: "998900000081", password: "wrong1" }), /noto'g'ri/);
+    const again = await loginWithPassword({ role: "sender", phone: "998900000081", password: "sir123" });
+    assert.equal(again.account.id, session.account.id);
+    const reset = await beginPasswordReset({ role: "sender", phone: "998900000081" });
+    assert.equal(await attachLoginChat(reset.id, 77), true);
+    assert.equal(await confirmLoginContact(77, "998900000081", true), "ok");
+    await finishPasswordReset({ id: reset.id, password: "next123" });
+    await assert.rejects(() => loginWithPassword({ role: "sender", phone: "998900000081", password: "sir123" }), /noto'g'ri/);
+    const next = await loginWithPassword({ role: "sender", phone: "998900000081", password: "next123" });
+    assert.ok(next.token);
+  } finally {
+    if (prevToken === undefined) delete process.env.TELEGRAM_LOGIN_BOT_TOKEN;
+    else process.env.TELEGRAM_LOGIN_BOT_TOKEN = prevToken;
+    if (prevName === undefined) delete process.env.TELEGRAM_LOGIN_BOT_USERNAME;
+    else process.env.TELEGRAM_LOGIN_BOT_USERNAME = prevName;
+  }
 });
 
 test("sinov hisobi HTTP orqali ham ochilmaydi", async () => {

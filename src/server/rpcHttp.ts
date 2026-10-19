@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { actorStore } from "./actorContext";
 import { actorFromToken, deliveryDatabaseStatus, rememberActor } from "./deliveryService";
+import { handleLoginBot } from "./loginBot";
 import { handlePartner } from "./partner";
 import { PUBLIC_RPC, RPC, type RpcName } from "./rpc";
 import { setGuestActor } from "./store";
@@ -29,9 +30,12 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 export function createRpcServer(onHandled?: () => void) {
   return createServer((req, res) => {
-    void handlePartner(req, res, onHandled).then((handled) => {
-      if (handled) return;
-      routeRpc(req, res, onHandled);
+    void handleLoginBot(req, res).then((loginHandled) => {
+      if (loginHandled) return;
+      void handlePartner(req, res, onHandled).then((handled) => {
+        if (handled) return;
+        routeRpc(req, res, onHandled);
+      });
     });
   });
 }

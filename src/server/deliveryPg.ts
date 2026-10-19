@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { OrderStatus, Role } from "../types";
-import type { AddressUse, DeliveryOrder, DeliveryRepository, DeliveryUser, OtpRow, SessionRow } from "./deliveryRepo";
+import type { AddressUse, DeliveryOrder, DeliveryRepository, DeliveryUser, LoginChallenge, OtpRow, SessionRow } from "./deliveryRepo";
 import { markDeliveryDatabaseReady, setDeliveryDatabaseReason, useDeliveryRepository } from "./deliveryService";
 
 type Queryable = {
@@ -28,6 +28,21 @@ function asUser(body: unknown, isAdmin: boolean, pushToken: unknown): DeliveryUs
 
 function asOrder(body: unknown): DeliveryOrder {
   return body as DeliveryOrder;
+}
+
+function asChallenge(row: Record<string, unknown>): LoginChallenge {
+  const purpose = row.purpose === "reset" ? "reset" : "signup";
+  const role = row.role === "courier" ? "courier" : "sender";
+  return {
+    id: String(row.id),
+    phone: String(row.phone),
+    role,
+    purpose,
+    name: typeof row.name === "string" ? row.name : "",
+    chatId: row.chat_id == null ? null : Number(row.chat_id),
+    confirmed: row.confirmed === true,
+    expiresAt: Number(row.expires_at),
+  };
 }
 
 class PgDeliveryRepository implements DeliveryRepository {
@@ -139,6 +154,39 @@ class PgDeliveryRepository implements DeliveryRepository {
 
   async deleteSession(tokenHash: string): Promise<void> {
     await this.db().query("delete from public.eg_delivery_sessions where token_hash = $1", [tokenHash]);
+  }
+
+  async deleteSessionsForUser(userId: string): Promise<void> {
+    await this.db().query("delete from public.eg_delivery_sessions where user_id = $1", [userId]);
+  }
+
+  async writeLoginChallenge(row: LoginChallenge): Promise<void> {
+    await this.db().query(
+      `insert into public.eg_login_challenges (id, phone, role, purpose, name, chat_id, confirmed, expires_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       on conflict (id) do update set
+         phone = excluded.phone,
+         role = excluded.role,
+         purpose = excluded.purpose,
+         name = excluded.name,
+         chat_id = excluded.chat_id,
+         confirmed = excluded.confirmed,
+         expires_at = excluded.expires_at`,
+      [row.id, row.phone, row.role, row.purpose, row.name, row.chatId, row.confirmed, row.expiresAt],
+    );
+  }
+
+  async readLoginChallenge(id: string): Promise<LoginChallenge | null> {
+    const result = await this.db().query("select * from public.eg_login_challenges where id = $1", [id]);
+    return result.rows[0] ? asChallenge(result.rows[0]) : null;
+  }
+
+  async readLoginChallengeByChat(chatId: number): Promise<LoginChallenge | null> {
+    const result = await this.db().query(
+      "select * from public.eg_login_challenges where chat_id = $1 order by expires_at desc limit 1",
+      [chatId],
+    );
+    return result.rows[0] ? asChallenge(result.rows[0]) : null;
   }
 
   async readOrder(id: string): Promise<DeliveryOrder | null> {

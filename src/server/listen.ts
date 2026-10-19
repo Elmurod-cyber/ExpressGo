@@ -7,6 +7,7 @@ import { connectTripDatabase, tripRepository } from "./tripDb";
 import { connectConstructionDatabase, constructionRepository } from "./constructionDb";
 import { connectFoodDatabase, listFoodOrdersForBoot, saveFoodCartRows, saveFoodOrderRow, saveFoodUserRow } from "./foodDb";
 import { setFoodNotify, setFoodPersist } from "./foodPersist";
+import { armLoginBot } from "./loginBot";
 import { armTelegram, notifyKitchen } from "./partner";
 import { createRpcServer } from "./rpcHttp";
 
@@ -97,6 +98,7 @@ void (async () => {
     void notifyKitchen(info);
   });
   await armTelegram();
+  await armLoginBot();
 
   const construction = await connectConstructionDatabase();
   if (construction.ok) {

@@ -43,6 +43,17 @@ create table if not exists public.eg_address_uses (
   updated_at bigint not null
 );
 
+create table if not exists public.eg_login_challenges (
+  id text primary key,
+  phone text not null,
+  role text not null,
+  purpose text not null,
+  name text not null default '',
+  chat_id bigint,
+  confirmed boolean not null default false,
+  expires_at bigint not null
+);
+
 create table if not exists public.eg_delivery_orders (
   id text primary key,
   sender_id text not null references public.eg_delivery_users (id),
@@ -56,30 +67,35 @@ alter table public.eg_delivery_users enable row level security;
 alter table public.eg_delivery_sessions enable row level security;
 alter table public.eg_delivery_otps enable row level security;
 alter table public.eg_address_uses enable row level security;
+alter table public.eg_login_challenges enable row level security;
 alter table public.eg_delivery_orders enable row level security;
 
 alter table public.eg_delivery_users force row level security;
 alter table public.eg_delivery_sessions force row level security;
 alter table public.eg_delivery_otps force row level security;
 alter table public.eg_address_uses force row level security;
+alter table public.eg_login_challenges force row level security;
 alter table public.eg_delivery_orders force row level security;
 
 revoke all on table public.eg_delivery_users from public;
 revoke all on table public.eg_delivery_sessions from public;
 revoke all on table public.eg_delivery_otps from public;
 revoke all on table public.eg_address_uses from public;
+revoke all on table public.eg_login_challenges from public;
 revoke all on table public.eg_delivery_orders from public;
 
 revoke all on table public.eg_delivery_users from anon;
 revoke all on table public.eg_delivery_sessions from anon;
 revoke all on table public.eg_delivery_otps from anon;
 revoke all on table public.eg_address_uses from anon;
+revoke all on table public.eg_login_challenges from anon;
 revoke all on table public.eg_delivery_orders from anon;
 
 revoke all on table public.eg_delivery_users from authenticated;
 revoke all on table public.eg_delivery_sessions from authenticated;
 revoke all on table public.eg_delivery_otps from authenticated;
 revoke all on table public.eg_address_uses from authenticated;
+revoke all on table public.eg_login_challenges from authenticated;
 revoke all on table public.eg_delivery_orders from authenticated;
 
 -- Siyosat yo'q. Anon va authenticated o'qiy olmaydi va yoza olmaydi.

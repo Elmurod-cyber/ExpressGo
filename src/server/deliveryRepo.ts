@@ -44,6 +44,18 @@ export type DeliveryUser = {
   ledger: LedgerEntry[];
   createdAt: number;
   updatedAt: number;
+  passwordHash?: string | null;
+};
+
+export type LoginChallenge = {
+  id: string;
+  phone: string;
+  role: Role;
+  purpose: "signup" | "reset";
+  name: string;
+  chatId: number | null;
+  confirmed: boolean;
+  expiresAt: number;
 };
 
 export type DeliveryOrder = {
@@ -97,6 +109,10 @@ export type DeliveryRepository = {
   writeSession(row: SessionRow): Promise<void>;
   readSession(tokenHash: string): Promise<SessionRow | null>;
   deleteSession(tokenHash: string): Promise<void>;
+  deleteSessionsForUser(userId: string): Promise<void>;
+  writeLoginChallenge(row: LoginChallenge): Promise<void>;
+  readLoginChallenge(id: string): Promise<LoginChallenge | null>;
+  readLoginChallengeByChat(chatId: number): Promise<LoginChallenge | null>;
   readOrder(id: string): Promise<DeliveryOrder | null>;
   listOrders(): Promise<DeliveryOrder[]>;
   insertOrder(order: DeliveryOrder): Promise<void>;
@@ -113,10 +129,11 @@ type FileData = {
   otps: OtpRow[];
   sessions: SessionRow[];
   addresses: AddressUse[];
+  challenges: LoginChallenge[];
 };
 
 function emptyData(): FileData {
-  return { users: [], orders: [], otps: [], sessions: [], addresses: [] };
+  return { users: [], orders: [], otps: [], sessions: [], addresses: [], challenges: [] };
 }
 
 function clone<T>(value: T): T {
@@ -132,6 +149,7 @@ export function createFileDeliveryRepository(file: string): DeliveryRepository {
   data.otps ??= [];
   data.sessions ??= [];
   data.addresses ??= [];
+  data.challenges ??= [];
   let tail: Promise<void> = Promise.resolve();
   let depth = 0;
 
@@ -205,6 +223,28 @@ export function createFileDeliveryRepository(file: string): DeliveryRepository {
       await gate(() => {
         const index = data.sessions.findIndex((item) => item.tokenHash === tokenHash);
         if (index >= 0) data.sessions.splice(index, 1);
+      });
+    },
+    async deleteSessionsForUser(userId) {
+      await gate(() => {
+        data.sessions = data.sessions.filter((item) => item.userId !== userId);
+      });
+    },
+    async writeLoginChallenge(row) {
+      await gate(() => {
+        const index = data.challenges.findIndex((item) => item.id === row.id);
+        if (index < 0) data.challenges.push(clone(row));
+        else data.challenges[index] = clone(row);
+      });
+    },
+    async readLoginChallenge(id) {
+      return gate(() => clone(data.challenges.find((item) => item.id === id) ?? null));
+    },
+    async readLoginChallengeByChat(chatId) {
+      return gate(() => {
+        const rows = data.challenges.filter((item) => item.chatId === chatId);
+        rows.sort((a, b) => b.expiresAt - a.expiresAt);
+        return clone(rows[0] ?? null);
       });
     },
     async readOrder(id) {

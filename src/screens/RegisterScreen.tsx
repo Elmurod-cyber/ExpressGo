@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../components/Screen";
+import { TelegramAuth } from "../components/TelegramAuth";
 import { BrandMark } from "../components/BrandMark";
 import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
@@ -25,7 +26,28 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [code, setCode] = useState("");
+  const [door, setDoor] = useState<"loading" | "code" | "telegram">("loading");
+  const [botName, setBotName] = useState("");
   const signup = mode === "signup";
+
+  useEffect(() => {
+    let stop = false;
+    void api
+      .authMethod()
+      .then((row) => {
+        if (stop) return;
+        if (row.mode === "telegram") {
+          setBotName(row.username);
+          setDoor("telegram");
+        } else setDoor("code");
+      })
+      .catch(() => {
+        if (!stop) setDoor("code");
+      });
+    return () => {
+      stop = true;
+    };
+  }, []);
 
   function switchMode(next: AuthMode) {
     setMode(next);
@@ -81,6 +103,20 @@ export function RegisterScreen({ role, onBack }: RegisterScreenProps) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (door === "loading") {
+    return (
+      <Screen>
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-sm text-muted">{t("boot.wait")}</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (door === "telegram") {
+    return <TelegramAuth role={role} username={botName} onBack={onBack} />;
   }
 
   if (challenge) {

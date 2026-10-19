@@ -76,6 +76,13 @@ const SHARED_RPC = new Set([
   "login",
   "requestOtp",
   "verifyOtp",
+  "authMethod",
+  "beginTelegramSignup",
+  "beginPasswordReset",
+  "telegramSignupStatus",
+  "finishTelegramSignup",
+  "finishPasswordReset",
+  "loginWithPassword",
   "getAccount",
   "creditCourier",
   "topUp",
@@ -135,6 +142,39 @@ export const api = {
   },
   requestOtp(input: { role: Role; phone: string }): Promise<OtpChallenge> {
     return invoke("requestOtp", [input], () => server.requestOtp(input));
+  },
+  authMethod(): Promise<{ mode: "telegram"; username: string } | { mode: "code" }> {
+    return invoke("authMethod", [], () => ({ mode: "code" as const }));
+  },
+  beginTelegramSignup(input: { role: Role; name: string; phone: string }): Promise<{ id: string; expiresAt: number }> {
+    return invoke("beginTelegramSignup", [input], () => {
+      throw new Error(t("delivery.server_need"));
+    });
+  },
+  beginPasswordReset(input: { role: Role; phone: string }): Promise<{ id: string; expiresAt: number }> {
+    return invoke("beginPasswordReset", [input], () => {
+      throw new Error(t("delivery.server_need"));
+    });
+  },
+  telegramSignupStatus(id: string): Promise<{ state: "wait" | "confirmed" | "expired" }> {
+    return invoke("telegramSignupStatus", [id], () => {
+      throw new Error(t("delivery.server_need"));
+    });
+  },
+  finishTelegramSignup(input: { id: string; password: string }): Promise<AuthSession> {
+    return invoke("finishTelegramSignup", [input], () => {
+      throw new Error(t("delivery.server_need"));
+    });
+  },
+  finishPasswordReset(input: { id: string; password: string }): Promise<AuthSession> {
+    return invoke("finishPasswordReset", [input], () => {
+      throw new Error(t("delivery.server_need"));
+    });
+  },
+  loginWithPassword(input: { role: Role; phone: string; password: string }): Promise<AuthSession> {
+    return invoke("loginWithPassword", [input], () => {
+      throw new Error(t("delivery.server_need"));
+    });
   },
   verifyOtp(input: { role: Role; phone: string; code: string }): Promise<AuthSession> {
     return invoke("verifyOtp", [input], () => {

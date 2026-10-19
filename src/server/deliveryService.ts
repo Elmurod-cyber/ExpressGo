@@ -5,6 +5,7 @@ import {
   type DeliveryOrder,
   type DeliveryRepository,
   type DeliveryUser,
+  type LoginChallenge,
 } from "./deliveryRepo";
 import { t } from "../i18n";
 import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
@@ -167,6 +168,7 @@ function blankUser(input: { role: Role; name: string; phone: string; vehicle: Ve
     lng: null,
     locationAt: null,
     phoneVerified: false,
+    passwordHash: null,
     pushToken: null,
     passportUri: null,
     licenseUri: null,
@@ -421,6 +423,155 @@ export async function verifyLogin(input: {
   const token = randomBytes(32).toString("hex");
   await store.writeSession({ tokenHash: sha256(token), userId: user.id, expiresAt: Date.now() + SESSION_MS });
   return { account: toAccount(user), token };
+}
+
+const LOGIN_CHALLENGE_MS = 10 * 60 * 1000;
+
+export function authMethod(): { mode: "telegram"; username: string } | { mode: "code" } {
+  const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN?.trim() ?? "";
+  const username = (process.env.TELEGRAM_LOGIN_BOT_USERNAME ?? "").trim().replace(/^@/, "");
+  if (!token || !/^[A-Za-z0-9_]{5,32}$/.test(username)) return { mode: "code" };
+  return { mode: "telegram", username };
+}
+
+function phoneTail(phone: string): string {
+  return digits(phone).slice(-9);
+}
+
+function sameTail(left: string, right: string): boolean {
+  const a = phoneTail(left);
+  const b = phoneTail(right);
+  return a.length === 9 && a === b;
+}
+
+function cleanPassword(value: string): string {
+  const password = value.trim();
+  if (password.length < 6 || password.length > 64) fail("Parol kamida 6 ta belgi bo'lsin.");
+  return password;
+}
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  return `${salt}:${sha256(salt + password)}`;
+}
+
+function checkPassword(password: string, stored: string | null | undefined): boolean {
+  if (!stored) return false;
+  const split = stored.indexOf(":");
+  if (split < 1) return false;
+  const salt = stored.slice(0, split);
+  const hash = stored.slice(split + 1);
+  return sameHash(sha256(salt + password), hash);
+}
+
+async function openSession(user: DeliveryUser): Promise<{ account: Account; token: string }> {
+  user.phoneVerified = true;
+  user.updatedAt = Date.now();
+  applyServerAdmin(user);
+  await repo().writeUser(user);
+  const token = randomBytes(32).toString("hex");
+  await repo().writeSession({ tokenHash: sha256(token), userId: user.id, expiresAt: Date.now() + SESSION_MS });
+  return { account: toAccount(user), token };
+}
+
+async function freshChallenge(input: { phone: string; role: Role; purpose: "signup" | "reset"; name: string }): Promise<LoginChallenge> {
+  const row: LoginChallenge = {
+    id: randomBytes(9).toString("hex"),
+    phone: input.phone,
+    role: input.role,
+    purpose: input.purpose,
+    name: input.name,
+    chatId: null,
+    confirmed: false,
+    expiresAt: Date.now() + LOGIN_CHALLENGE_MS,
+  };
+  await repo().writeLoginChallenge(row);
+  return row;
+}
+
+function liveChallenge(row: LoginChallenge | null): LoginChallenge {
+  if (!row || Date.now() > row.expiresAt) fail("Tasdiqlash muddati tugadi. Qaytadan boshlang.");
+  return row;
+}
+
+export async function beginTelegramSignup(input: { role: Role | string; name: string; phone: string }): Promise<LoginChallenge> {
+  if (authMethod().mode !== "telegram") fail("Telegram tasdig'i hali yoqilmagan.");
+  const role = assertRole(input.role);
+  const name = input.name.trim();
+  const phone = digits(input.phone);
+  if (name.length < 2) fail("Ismingizni yozing.");
+  if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
+  if (await repo().readUserByPhone(phone, role)) fail("Bu telefon allaqachon ro'yxatdan o'tgan. Kirishni tanlang.");
+  return freshChallenge({ phone, role, purpose: "signup", name });
+}
+
+export async function beginPasswordReset(input: { role: Role | string; phone: string }): Promise<LoginChallenge> {
+  if (authMethod().mode !== "telegram") fail("Telegram tasdig'i hali yoqilmagan.");
+  const role = assertRole(input.role);
+  const phone = digits(input.phone);
+  if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
+  const user = await repo().readUserByPhone(phone, role);
+  if (!user) fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
+  return freshChallenge({ phone, role, purpose: "reset", name: user.name });
+}
+
+export async function telegramSignupStatus(id: string): Promise<{ state: "wait" | "confirmed" | "expired" }> {
+  const row = await repo().readLoginChallenge(id.trim());
+  if (!row || Date.now() > row.expiresAt) return { state: "expired" };
+  return { state: row.confirmed ? "confirmed" : "wait" };
+}
+
+export async function attachLoginChat(id: string, chatId: number): Promise<boolean> {
+  const row = await repo().readLoginChallenge(id.trim());
+  if (!row || Date.now() > row.expiresAt || row.confirmed) return false;
+  row.chatId = chatId;
+  await repo().writeLoginChallenge(row);
+  return true;
+}
+
+export async function confirmLoginContact(chatId: number, phone: string, own: boolean): Promise<"ok" | "mismatch" | "missing"> {
+  if (!own) return "mismatch";
+  const row = await repo().readLoginChallengeByChat(chatId);
+  if (!row || Date.now() > row.expiresAt) return "missing";
+  if (!sameTail(row.phone, phone)) return "mismatch";
+  row.confirmed = true;
+  await repo().writeLoginChallenge(row);
+  return "ok";
+}
+
+export async function finishTelegramSignup(input: { id: string; password: string }): Promise<{ account: Account; token: string }> {
+  const row = liveChallenge(await repo().readLoginChallenge(input.id.trim()));
+  if (row.purpose !== "signup" || !row.confirmed) fail("Avval Telegramda raqamni yuboring.");
+  const password = cleanPassword(input.password);
+  if (await repo().readUserByPhone(row.phone, row.role)) fail("Bu telefon allaqachon ro'yxatdan o'tgan. Kirishni tanlang.");
+  const user = blankUser({ role: row.role, name: row.name, phone: row.phone, vehicle: null });
+  user.passwordHash = hashPassword(password);
+  user.phoneVerified = true;
+  return openSession(user);
+}
+
+export async function finishPasswordReset(input: { id: string; password: string }): Promise<{ account: Account; token: string }> {
+  const row = liveChallenge(await repo().readLoginChallenge(input.id.trim()));
+  if (row.purpose !== "reset" || !row.confirmed) fail("Avval Telegramda raqamni yuboring.");
+  const password = cleanPassword(input.password);
+  const user = await repo().readUserByPhone(row.phone, row.role);
+  if (!user) fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
+  user.passwordHash = hashPassword(password);
+  await repo().deleteSessionsForUser(user.id);
+  return openSession(user);
+}
+
+export async function loginWithPassword(input: { role: Role | string; phone: string; password: string }): Promise<{ account: Account; token: string }> {
+  const role = assertRole(input.role);
+  const phone = digits(input.phone);
+  const password = input.password.trim();
+  if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
+  if (password.length < 6) fail("Parol kamida 6 ta belgi bo'lsin.");
+  const user = await repo().readUserByPhone(phone, role);
+  if (!user) fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
+  if (!user.passwordHash) fail("Parol yo'q. Telegramda yangi parol qo'ying.");
+  if (!checkPassword(password, user.passwordHash)) fail("Parol noto'g'ri.");
+  return openSession(user);
 }
 
 export async function saveProfile(
