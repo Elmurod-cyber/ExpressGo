@@ -108,6 +108,7 @@ type UserRecord = {
   role: Role;
   name: string;
   phone: string;
+  photo?: string | null;
   balance: number;
   home: SavedPlace | null;
   shop: SavedPlace | null;
@@ -1002,6 +1003,7 @@ function toAccount(user: UserRecord): Account {
     role: user.role,
     name: user.name,
     phone: user.phone,
+    photo: user.photo ?? null,
     balance: user.role === "courier" ? user.balance : null,
     saved: toSaved(user),
     vehicle: user.role === "courier" ? user.vehicle : null,
@@ -1903,7 +1905,15 @@ export function getAccount(userId: string): Account {
   return toAccount(requireUser(userId));
 }
 
-export function updateProfile(userId: string, input: { name?: string; phone?: string }): Account {
+export function profilePhoto(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const photo = value.trim();
+  if (!photo) return null;
+  if (!photo.startsWith("data:image/") || photo.length > 400_000) fail("Rasm juda katta. Boshqa rasm tanlang.");
+  return photo;
+}
+
+export function updateProfile(userId: string, input: { name?: string; phone?: string; photo?: string | null }): Account {
   const user = requireUser(userId);
   const name = (input.name ?? user.name).trim();
   const phone = phoneKey(input.phone ?? user.phone);
@@ -1920,6 +1930,7 @@ export function updateProfile(userId: string, input: { name?: string; phone?: st
   const oldPhone = user.phone;
   user.name = name;
   user.phone = phone;
+  if (input.photo !== undefined) user.photo = profilePhoto(input.photo);
   for (const other of users) {
     if (other.id !== user.id && other.phone === oldPhone) {
       other.name = name;

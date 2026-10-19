@@ -22,6 +22,7 @@ export type DeliveryUser = {
   role: Role;
   isAdmin: boolean;
   name: string;
+  photo?: string | null;
   balance: number;
   vehicle: VehicleKind | null;
   shiftOn: boolean;

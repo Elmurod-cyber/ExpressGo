@@ -160,6 +160,7 @@ export type Account = {
   role: Role;
   name: string;
   phone: string;
+  photo: string | null;
   balance: number | null;
   saved: SavedAddresses;
   vehicle: VehicleKind | null;

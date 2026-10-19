@@ -11,7 +11,7 @@ import { sendLoginCode, smsTestMode, SMS_TEST_CODE } from "./sms";
 import { kmBetween } from "../services/distance";
 import { sendPushNotification } from "./expoPush";
 import { setAccountNotify } from "./notifyBus";
-import { attachSignedInUser, setPushToken } from "./store";
+import { attachSignedInUser, profilePhoto, setPushToken } from "./store";
 import { listingArea } from "./places";
 import {
   asVehicle,
@@ -233,6 +233,7 @@ function toAccount(user: DeliveryUser): Account {
     role: user.role,
     name: user.name,
     phone: user.phone,
+    photo: user.photo ?? null,
     balance: user.role === "courier" ? user.balance : null,
     saved: { home: null, shop: null },
     vehicle: user.role === "courier" ? user.vehicle : null,
@@ -390,6 +391,27 @@ export async function verifyLogin(input: {
   const token = randomBytes(32).toString("hex");
   await store.writeSession({ tokenHash: sha256(token), userId: user.id, expiresAt: Date.now() + SESSION_MS });
   return { account: toAccount(user), token };
+}
+
+export async function saveProfile(
+  actor: Actor,
+  input: { name?: string; phone?: string; photo?: string | null },
+): Promise<Account> {
+  const user = await repo().readUser(actor.id);
+  if (!user) fail("Hisob topilmadi.");
+  const name = (input.name ?? user.name).trim();
+  const phone = digits(input.phone ?? user.phone);
+  if (name.length < 2) fail("Ismingizni yozing.");
+  if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
+  const taken = (await repo().listUsers()).find((item) => item.id !== user.id && item.role === user.role && digits(item.phone) === phone);
+  if (taken) fail("Bu telefon bilan boshqa hisob bor.");
+  user.name = name;
+  user.phone = phone;
+  if (input.photo !== undefined) user.photo = profilePhoto(input.photo);
+  user.updatedAt = Date.now();
+  await repo().writeUser(user);
+  attachSignedInUser({ id: user.id, role: user.role, name: user.name, phone: user.phone });
+  return toAccount(user);
 }
 
 export async function accountOf(actor: Actor): Promise<Account> {

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Image, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSession, useT } from "../context/Session";
 import { LANGUAGE_SWITCH_ENABLED } from "../i18n";
 import { LanguageSwitch } from "./LanguageSwitch";
@@ -12,6 +13,7 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
   const t = useT();
   const [name, setName] = useState(account?.name ?? "");
   const [phone, setPhone] = useState(formatUzPhone(account?.phone ?? ""));
+  const [photo, setPhoto] = useState<string | null>(account?.photo ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,7 +23,7 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      replaceAccount(await api.updateProfile(account.id, { name, phone }));
+      replaceAccount(await api.updateProfile(account.id, { name, phone, photo }));
       if (onClose) onClose();
       else setSaved(true);
     } catch (caught) {
@@ -29,6 +31,29 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function pickPhoto(from: "library" | "camera") {
+    const permission =
+      from === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError(t("profile.photo_need"));
+      return;
+    }
+    const picked =
+      from === "camera"
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.35, base64: true, allowsEditing: true, aspect: [1, 1] })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.35, base64: true, allowsEditing: true, aspect: [1, 1] });
+    const shot = picked.canceled ? "" : picked.assets[0]?.base64 ?? "";
+    if (!shot) return;
+    const uri = `data:image/jpeg;base64,${shot}`;
+    if (uri.length > 400_000) {
+      setError(t("build.photo_big"));
+      return;
+    }
+    setPhoto(uri);
+    setSaved(false);
+    setError(null);
   }
 
   if (!account) return null;
@@ -69,6 +94,36 @@ export function ProfilePanel({ onClose }: { onClose?: () => void }) {
           <View className={`h-5 w-5 rounded-full bg-card ${pushOn ? "self-end" : "self-start"}`} />
         </View>
       </Pressable>
+
+      <View className="mt-4 items-center">
+        <Pressable
+          onPress={() => void pickPhoto("library")}
+          accessibilityRole="button"
+          className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-canvas"
+        >
+          {photo ? (
+            <Image source={{ uri: photo }} style={{ width: 96, height: 96 }} accessibilityLabel={t("profile")} />
+          ) : (
+            <Ionicons name="person" size={42} color="#FF8A00" />
+          )}
+        </Pressable>
+        <View className="mt-3 flex-row">
+          <Pressable
+            onPress={() => void pickPhoto("library")}
+            accessibilityRole="button"
+            className="mr-2 rounded-full bg-[#121212] px-4 py-2"
+          >
+            <Text className="text-sm font-bold text-white">{t("profile.photo_gallery")}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void pickPhoto("camera")}
+            accessibilityRole="button"
+            className="rounded-full bg-[#FF8A00] px-4 py-2"
+          >
+            <Text className="text-sm font-bold text-[#171717]">{t("profile.photo_camera")}</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <Field label={t("auth.name")}>
         <TextInput

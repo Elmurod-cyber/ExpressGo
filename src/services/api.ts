@@ -146,7 +146,7 @@ export const api = {
   getAccount(userId: string): Promise<Account> {
     return invoke("getAccount", [userId], () => server.getAccount(userId));
   },
-  updateProfile(userId: string, input: { name?: string; phone?: string }): Promise<Account> {
+  updateProfile(userId: string, input: { name?: string; phone?: string; photo?: string | null }): Promise<Account> {
     return invoke("updateProfile", [userId, input], () => server.updateProfile(userId, input));
   },
   setPushToken(userId: string, token: string): Promise<void> {

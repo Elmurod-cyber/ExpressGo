@@ -167,7 +167,11 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
             accessibilityLabel={t("nav.profile")}
             className="ml-2 h-10 w-10 items-center justify-center"
           >
-            <Ionicons name="person-circle-outline" size={28} color={night ? "#F4F6FB" : "#101828"} />
+            {account?.photo ? (
+              <Image source={{ uri: account.photo }} style={{ width: 32, height: 32, borderRadius: 16 }} accessibilityLabel={t("nav.profile")} />
+            ) : (
+              <Ionicons name="person-circle-outline" size={28} color={night ? "#F4F6FB" : "#101828"} />
+            )}
           </Pressable>
         </View>
         <Pressable onPress={area.openPicker} accessibilityRole="button" className="mt-3 flex-row items-center self-start">

@@ -17,7 +17,7 @@ export const RPC = {
     throw new Error("Sinov hisobi o'chirilgan.");
   },
   getAccount: (_userId?: string) => delivery.accountOf(requireActor()),
-  updateProfile: (_userId: string, input: Parameters<typeof store.updateProfile>[1]) => store.updateProfile(me(), input),
+  updateProfile: (_userId: string, input: Parameters<typeof delivery.saveProfile>[1]) => delivery.saveProfile(requireActor(), input),
   setPushToken: (_userId: string, token: string) => delivery.savePushToken(requireActor(), token),
   listInbox: (_userId: string) => store.listInbox(me()),
   markInboxRead: (_userId: string, noteId?: string | null) => store.markInboxRead(me(), noteId),
