@@ -3,8 +3,7 @@ import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useSession, useT } from "../context/Session";
-import { LANGUAGE_SWITCH_ENABLED } from "../i18n";
-import { LanguageSwitch } from "./LanguageSwitch";
+import { ThemeSwitch } from "./ThemeSwitch";
 import { AdminEntry } from "./DemoDock";
 import { api } from "../services/api";
 import { editUzPhone, formatUzPhone } from "../services/phoneMask";
@@ -106,7 +105,7 @@ export function ProfilePanel({
             <Text className="text-base font-bold text-ink">{t("profile")}</Text>
             <Text className="text-xs text-muted">{t("profile.sender")}</Text>
           </View>
-          {LANGUAGE_SWITCH_ENABLED ? <LanguageSwitch flush /> : null}
+          <ThemeSwitch compact />
           {onClose ? (
             <Pressable
               onPress={onClose}

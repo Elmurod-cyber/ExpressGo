@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { Screen } from "../components/Screen";
 import { LanguageSwitch } from "../components/LanguageSwitch";
-import { ThemeSwitch } from "../components/ThemeSwitch";
 import { useNight } from "../services/theme";
 import { BrandMark } from "../components/BrandMark";
 import { statusLabel } from "../components/orderStatus";
@@ -155,12 +154,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
               {t("welcome.slogan")}
             </Text>
           </View>
-          <View className="self-start">
-            <ThemeSwitch compact />
-            <View className="mt-1">
-              <LanguageSwitch light={night} compact />
-            </View>
-          </View>
+          <LanguageSwitch light={night} compact />
           <Pressable
             onPress={onProfile}
             accessibilityRole="button"
