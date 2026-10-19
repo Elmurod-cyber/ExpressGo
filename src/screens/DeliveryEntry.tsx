@@ -5,6 +5,7 @@ import { Screen } from "../components/Screen";
 import { statusLabel } from "../components/orderStatus";
 import { useT } from "../context/Session";
 import { formatMoney } from "../services/money";
+import { useNight } from "../services/theme";
 import { VEHICLE_LABEL } from "../server/rules";
 import type { LiveJob } from "../types";
 
@@ -22,6 +23,7 @@ export function DeliveryEntry({
   children?: ReactNode;
 }) {
   const t = useT();
+  const night = useNight();
   return (
     <Screen compact>
       <View className="px-4 pb-6 pt-2">
@@ -60,16 +62,16 @@ export function DeliveryEntry({
               key={job.id}
               onPress={() => onOpenJob(job.id)}
               accessibilityRole="button"
-              className="mt-3 rounded-3xl bg-[#E7EEF6] px-4 py-2.5 active:opacity-90"
+              className={`mt-3 rounded-3xl px-4 py-2.5 active:opacity-90 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#E7EEF6]"}`}
             >
-              <Text className="text-xs font-semibold text-brand">{statusLabel[job.status]}</Text>
-              <Text className="mt-2 text-base font-semibold text-ink">
+              <Text className={`text-xs font-semibold ${night ? "text-[#8EBCFF]" : "text-brand"}`}>{statusLabel[job.status]}</Text>
+              <Text className={`mt-2 text-base font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>
                 {job.pickup} → {job.dropoff}
               </Text>
-              <Text className="mt-1 text-sm text-muted">
+              <Text className={`mt-1 text-sm ${night ? "text-[#C8C8C8]" : "text-muted"}`}>
                 {job.item} · {VEHICLE_LABEL[job.vehicle]}
               </Text>
-              <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{formatMoney(job.deliveryFee)}</Text>
+              <Text className={`mt-2 self-end text-[21px] font-extrabold ${night ? "text-[#FF7A40]" : "text-[#C2410C]"}`}>{formatMoney(job.deliveryFee)}</Text>
             </Pressable>
           ))
         )}

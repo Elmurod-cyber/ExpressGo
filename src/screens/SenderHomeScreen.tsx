@@ -663,48 +663,53 @@ function Segment({
 
 function OrderRow({ order, map, onOpen }: { order: SenderOrder; map: boolean; onOpen: () => void }) {
   const { t } = useSession();
+  const night = useNight();
   const waiting = order.status === "posted";
   const track = trackLine(order, t);
   return (
-    <Pressable onPress={onOpen} accessibilityRole="button" className="mb-3 rounded-3xl bg-[#E7EEF6] px-4 py-2.5">
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      className={`mb-3 rounded-3xl px-4 py-2.5 ${night ? "border border-[#3A3A3A] bg-[#2C2C2C]" : "bg-[#E7EEF6]"}`}
+    >
       <View className="flex-row items-start justify-between">
-        <Text className="flex-1 pr-3 text-lg font-bold text-ink">{order.item}</Text>
+        <Text className={`flex-1 pr-3 text-lg font-bold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{order.item}</Text>
         <View className="flex-row items-center">
-          <View className={`mr-1.5 h-2 w-2 rounded-full ${waiting ? "bg-[#F5A524]" : "bg-brand"}`} />
-          <Text className={`text-xs font-semibold ${waiting ? "text-[#C47E09]" : "text-brand"}`}>
+          <View className={`mr-1.5 h-2 w-2 rounded-full ${waiting ? "bg-[#F5A524]" : night ? "bg-[#8EBCFF]" : "bg-brand"}`} />
+          <Text className={`text-xs font-semibold ${waiting ? (night ? "text-[#F5C16C]" : "text-[#C47E09]") : night ? "text-[#8EBCFF]" : "text-brand"}`}>
             {waiting ? (isJobOpen(order.readyAt) ? t("sender.waiting_short") : formatReadyAt(order.readyAt)) : statusLabel[order.status]}
           </Text>
         </View>
       </View>
-      <Text className="mt-1 text-xs font-medium uppercase tracking-wide text-muted">
+      <Text className={`mt-1 text-xs font-medium uppercase tracking-wide ${night ? "text-[#C8C8C8]" : "text-muted"}`}>
         {(order.courierName ?? order.customerName).toUpperCase()}
       </Text>
       <View className="mt-3 flex-row">
         <Ionicons name="location-sharp" size={16} color="#98A2B3" />
-        <Text className={`ml-2 flex-1 text-ink ${map ? "text-base font-semibold" : "text-sm"}`}>{order.pickup}</Text>
+        <Text className={`ml-2 flex-1 ${night ? "text-[#F4F6FB]" : "text-ink"} ${map ? "text-base font-semibold" : "text-sm"}`}>{order.pickup}</Text>
       </View>
       <View className="mt-2 flex-row">
         <Ionicons name="flag" size={15} color="#98A2B3" />
-        <Text className={`ml-2 flex-1 text-ink ${map ? "text-base font-semibold" : "text-sm"}`}>
+        <Text className={`ml-2 flex-1 ${night ? "text-[#F4F6FB]" : "text-ink"} ${map ? "text-base font-semibold" : "text-sm"}`}>
           {order.dropoffs.length > 1 ? order.dropoffs.map((stop) => stop.label).join(" → ") : order.dropoff}
         </Text>
       </View>
       {order.dropoffs.length > 1 ? (
-        <Text className="mt-1 text-xs font-semibold text-ink">{t("sender.stops", { n: order.dropoffs.length })}</Text>
+        <Text className={`mt-1 text-xs font-semibold ${night ? "text-[#F4F6FB]" : "text-ink"}`}>{t("sender.stops", { n: order.dropoffs.length })}</Text>
       ) : null}
-      <Text className="mt-1 text-xs text-muted">{t("sender.transport", { name: VEHICLE_LABEL[order.vehicle] })}</Text>
+      <Text className={`mt-1 text-xs ${night ? "text-[#C8C8C8]" : "text-muted"}`}>{t("sender.transport", { name: VEHICLE_LABEL[order.vehicle] })}</Text>
       {waiting && readyHint(order.readyAt) ? (
-        <Text className="mt-1 text-xs font-semibold text-[#C47E09]">{readyHint(order.readyAt)}</Text>
+        <Text className={`mt-1 text-xs font-semibold ${night ? "text-[#F5C16C]" : "text-[#C47E09]"}`}>{readyHint(order.readyAt)}</Text>
       ) : null}
-      {track ? <Text className="mt-2 text-sm font-semibold text-brand">{track}</Text> : null}
+      {track ? <Text className={`mt-2 text-sm font-semibold ${night ? "text-[#8EBCFF]" : "text-brand"}`}>{track}</Text> : null}
       {order.cancelAllowed && order.cancelTotal > 0 ? (
-        <Text className="mt-1 text-xs text-[#B42318]">{t("sender.cancel_fee", { money: formatMoney(order.cancelTotal) })}</Text>
+        <Text className={`mt-1 text-xs ${night ? "text-[#FF8B7A]" : "text-[#B42318]"}`}>{t("sender.cancel_fee", { money: formatMoney(order.cancelTotal) })}</Text>
       ) : null}
-      <Text className="mt-2 self-end text-[21px] font-extrabold text-[#C2410C]">{formatMoney(order.deliveryFee)}</Text>
+      <Text className={`mt-2 self-end text-[21px] font-extrabold ${night ? "text-[#FF7A40]" : "text-[#C2410C]"}`}>{formatMoney(order.deliveryFee)}</Text>
       {order.status === "delivered" && order.senderRating == null ? (
-        <Text className="mt-2 text-xs font-semibold text-brand">{t("sender.rate_hint")}</Text>
+        <Text className={`mt-2 text-xs font-semibold ${night ? "text-[#8EBCFF]" : "text-brand"}`}>{t("sender.rate_hint")}</Text>
       ) : order.senderRating != null ? (
-        <Text className="mt-2 text-xs text-muted">{t("sender.rated", { n: order.senderRating })}</Text>
+        <Text className={`mt-2 text-xs ${night ? "text-[#C8C8C8]" : "text-muted"}`}>{t("sender.rated", { n: order.senderRating })}</Text>
       ) : null}
     </Pressable>
   );
