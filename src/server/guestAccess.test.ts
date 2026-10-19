@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { actorStore } from "./actorContext";
 import {
+  setGuestActor,
   cancelMyFood,
   listMyFood,
   placeFoodOrder,
@@ -15,6 +16,7 @@ import { readDevOtp } from "./sms";
 import { sha256 } from "./sha256";
 
 process.env.EG_OTP_DEV = "1";
+setGuestActor(() => actorStore.getStore() ?? null);
 
 async function pass(kind: "rider" | "employer" | "food", phone: string, name: string) {
   const challenge = await requestGuestCode(kind, phone);

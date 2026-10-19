@@ -8,7 +8,6 @@ import { t, tx } from "../i18n";
 import { accountNotify } from "./notifyBus";
 import { notifyFoodOrder, persistFoodCart, persistFoodOrder, persistFoodUser } from "./foodPersist";
 import { kitchenByPhone } from "./kitchens";
-import { actorStore } from "./actorContext";
 import type {
   Account,
   AdCard,
@@ -3727,10 +3726,18 @@ function randomHex(bytes: number): string {
   return [...list].map((item) => item.toString(16).padStart(2, "0")).join("");
 }
 
+type SignedGuest = { phone: string; name: string } | null | undefined;
+
+let readSignedGuest: () => SignedGuest = () => null;
+
+export function setGuestActor(read: () => SignedGuest): void {
+  readSignedGuest = read;
+}
+
 function requireGuest(token: string, kind: GuestKind): GuestSession {
   const row = guestSessions.find((item) => item.kind === kind && token.length > 0 && sameHash(item.tokenHash, sha256(token)));
   if (row && row.until > Date.now()) return row;
-  const actor = actorStore.getStore();
+  const actor = readSignedGuest();
   const phone = actor ? phoneKey(actor.phone) : "";
   const name = actor?.name.trim() ?? "";
   if (phone.length >= 9 && name.length >= 2) {

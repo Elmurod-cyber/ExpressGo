@@ -3,7 +3,10 @@ import { actorStore } from "./actorContext";
 import { actorFromToken, deliveryDatabaseStatus, rememberActor } from "./deliveryService";
 import { handlePartner } from "./partner";
 import { PUBLIC_RPC, RPC, type RpcName } from "./rpc";
+import { setGuestActor } from "./store";
 import { tripDatabaseStatus } from "./tripDb";
+
+setGuestActor(() => actorStore.getStore() ?? null);
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, {
