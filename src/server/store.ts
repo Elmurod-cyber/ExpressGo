@@ -8,6 +8,7 @@ import { t, tx } from "../i18n";
 import { accountNotify } from "./notifyBus";
 import { notifyFoodOrder, persistFoodCart, persistFoodOrder, persistFoodUser } from "./foodPersist";
 import { kitchenByPhone } from "./kitchens";
+import { actorStore } from "./actorContext";
 import type {
   Account,
   AdCard,
@@ -3727,9 +3728,15 @@ function randomHex(bytes: number): string {
 }
 
 function requireGuest(token: string, kind: GuestKind): GuestSession {
-  const row = guestSessions.find((item) => item.kind === kind && sameHash(item.tokenHash, sha256(token)));
-  if (!row || row.until <= Date.now()) fail("Telefon tasdiqlanmagan. Kodni qayta yuboring.");
-  return row;
+  const row = guestSessions.find((item) => item.kind === kind && token.length > 0 && sameHash(item.tokenHash, sha256(token)));
+  if (row && row.until > Date.now()) return row;
+  const actor = actorStore.getStore();
+  const phone = actor ? phoneKey(actor.phone) : "";
+  const name = actor?.name.trim() ?? "";
+  if (phone.length >= 9 && name.length >= 2) {
+    return { tokenHash: "", kind, phone, name, until: Date.now() + GUEST_SESSION_MS };
+  }
+  fail("Telefon tasdiqlanmagan. Kodni qayta yuboring.");
 }
 
 export async function requestGuestCode(kind: string, phone: string): Promise<OtpChallenge> {

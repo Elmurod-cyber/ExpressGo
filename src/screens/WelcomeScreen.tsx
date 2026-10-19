@@ -23,7 +23,7 @@ import { DeliveryEntry } from "./DeliveryEntry";
 type Gate = "sender" | "rider";
 type Feed = "all" | "jobs" | "food" | "trips" | "barber" | "builder";
 
-export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => void }) {
+export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: boolean) => void; onProfile?: () => void }) {
   const t = useT();
   const { account } = useSession();
   const area = useArea();
@@ -111,16 +111,16 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
     return <RegisterScreen role="sender" onBack={() => setGate(null)} />;
   }
   if (gate === "rider") {
-    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />;
+    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} onNeedAccount={onProfile} />;
   }
   if (feed === "trips" && tripDoor === "gate") {
     return <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />;
   }
   if (feed === "food") {
-    return <FoodScreen onBack={() => setFeed("all")} />;
+    return <FoodScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />;
   }
   if (feed === "builder") {
-    return <BuildScreen onBack={() => setFeed("all")} />;
+    return <BuildScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />;
   }
   if (feed === "jobs") {
     return (
@@ -155,7 +155,14 @@ export function WelcomeScreen({ onChrome }: { onChrome?: (visible: boolean) => v
           <View className="self-start">
             <LanguageSwitch light compact />
           </View>
-          <Ionicons name="notifications-outline" size={22} color="#FFFFFF" style={{ marginLeft: 8 }} />
+          <Pressable
+            onPress={onProfile}
+            accessibilityRole="button"
+            accessibilityLabel={t("nav.profile")}
+            className="ml-2 h-10 w-10 items-center justify-center"
+          >
+            <Ionicons name="person-circle-outline" size={28} color="#FFFFFF" />
+          </Pressable>
         </View>
         <Pressable onPress={area.openPicker} accessibilityRole="button" className="mt-3 flex-row items-center self-start">
           <Ionicons name="location" size={16} color="#FF8A00" />

@@ -3,36 +3,30 @@ import { ActivityIndicator, Image, Keyboard, Linking, Pressable, ScrollView, Tex
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "./Screen";
 import { FoodHeader } from "./FoodHeader";
-import { PhoneCodeBox } from "./PhoneCodeBox";
 import { api } from "../services/api";
-import {
-  clearFoodProfile,
-  readFoodCart,
-  readFoodProfile,
-  saveFoodCartSnap,
-  saveFoodProfile,
-  type FoodCartSnap,
-  type FoodProfile,
-} from "../services/foodProfile";
+import { readFoodCart, saveFoodCartSnap, type FoodCartSnap, type FoodProfile } from "../services/foodProfile";
+import { getSessionToken } from "../services/sessionToken";
 import { FOOD_PLACES, type FoodDish, type FoodPlace } from "../data/foodPlaces";
 import { formatMoney } from "../services/money";
 import { formatUzPhone } from "../services/phoneMask";
-import { useT } from "../context/Session";
+import { useSession, useT } from "../context/Session";
 import type { FoodTicket, KitchenDesk } from "../types";
 
-export function FoodScreen({ onBack }: { onBack: () => void }) {
+export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNeedAccount?: () => void }) {
   const t = useT();
+  const { account } = useSession();
+  const customer: FoodProfile | null = account
+    ? { name: account.name, phone: account.phone, token: getSessionToken() }
+    : null;
   const [placeId, setPlaceId] = useState<string | null>(null);
-  const [customer, setCustomer] = useState<FoodProfile | null>(null);
   const [profileReady, setProfileReady] = useState(false);
   const [cart, setCart] = useState<FoodCartSnap>({ restaurantId: "", items: {} });
   const [openCart, setOpenCart] = useState(false);
   const cartCount = Object.values(cart.items).reduce((sum, qty) => sum + qty, 0);
   useEffect(() => {
     let stop = false;
-    void Promise.all([readFoodProfile(), readFoodCart()]).then(([row, saved]) => {
+    void readFoodCart().then((saved) => {
       if (stop) return;
-      setCustomer(row);
       setCart(saved);
       setProfileReady(true);
     });
@@ -66,7 +60,7 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
         onCartOpened={() => setOpenCart(false)}
         onCartChange={(dishId, next) => changeCart(place.id, dishId, next)}
         onCartClear={() => setCart({ restaurantId: place.id, items: {} })}
-        onCustomer={setCustomer}
+        onNeedAccount={onNeedAccount}
         onBack={() => setPlaceId(null)}
       />
     );
@@ -85,26 +79,7 @@ export function FoodScreen({ onBack }: { onBack: () => void }) {
             setOpenCart(true);
           }}
         />
-        {customer ? (
-          <>
-            <FoodMine
-              token={customer.token}
-              onExpired={() => {
-                void clearFoodProfile();
-                setCustomer(null);
-              }}
-            />
-            <Pressable
-              onPress={() => {
-                void clearFoodProfile().then(() => setCustomer(null));
-              }}
-              accessibilityRole="button"
-              className="mt-3 items-center rounded-full bg-white py-3"
-            >
-              <Text className="text-sm font-semibold text-muted">{t("food.other_phone")}</Text>
-            </Pressable>
-          </>
-        ) : null}
+        {customer ? <FoodMine token={customer.token} onExpired={() => onNeedAccount?.()} /> : null}
         {FOOD_PLACES.map((item) => (
           <Pressable
             key={item.id}
@@ -144,7 +119,7 @@ function PlaceMenu({
   onCartOpened,
   onCartChange,
   onCartClear,
-  onCustomer,
+  onNeedAccount,
 }: {
   place: FoodPlace;
   onBack: () => void;
@@ -154,7 +129,7 @@ function PlaceMenu({
   onCartOpened: () => void;
   onCartChange: (dishId: string, next: number) => void;
   onCartClear: () => void;
-  onCustomer: (next: FoodProfile | null) => void;
+  onNeedAccount?: () => void;
 }) {
   const t = useT();
   const pageScroll = useRef<ScrollView>(null);
@@ -237,13 +212,14 @@ function PlaceMenu({
       setError(t("food.drop"));
       return;
     }
+    if (!customer) {
+      setError(t("profile.need"));
+      onNeedAccount?.();
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      if (!customer) {
-        setOpen(true);
-        return;
-      }
       const ticket = await api.placeFoodOrder({
         placeId: place.id,
         placeName: place.name,
@@ -264,10 +240,7 @@ function PlaceMenu({
       setChoice(null);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : t("fail.generic");
-      if (message.includes("Telefon tasdiqlanmagan")) {
-        await clearFoodProfile();
-        onCustomer(null);
-      }
+      if (message.includes("Telefon tasdiqlanmagan")) onNeedAccount?.();
       setError(message);
     } finally {
       setBusy(false);
@@ -343,20 +316,11 @@ function PlaceMenu({
               <Text className="text-base font-bold text-ink">{formatMoney(total)}</Text>
             </View>
             {customer ? (
-              <Text className="mt-3 text-sm font-semibold text-ink">
-                {customer.name} · {formatUzPhone(customer.phone)}
-              </Text>
+              <Text className="mt-3 text-sm font-semibold text-ink">{t("profile.using", { name: customer.name, phone: formatUzPhone(customer.phone) })}</Text>
             ) : (
-              <PhoneCodeBox
-                kind="food"
-                title={t("otp.title")}
-                tone="orange"
-                onVerified={async (pass) => {
-                  const profile = { name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token };
-                  await saveFoodProfile(profile);
-                  onCustomer(profile);
-                }}
-              />
+              <Pressable onPress={onNeedAccount} accessibilityRole="button" className="mt-3 items-center rounded-2xl bg-[#121212] py-3">
+                <Text className="text-sm font-bold text-white">{t("profile.need")}</Text>
+              </Pressable>
             )}
             <TextInput
               value={dropoff}

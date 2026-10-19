@@ -3,12 +3,12 @@ import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { Screen } from "../components/Screen";
-import { useT } from "../context/Session";
-import { PhoneCodeBox } from "../components/PhoneCodeBox";
+import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
+import { getSessionToken } from "../services/sessionToken";
 import { formatMoney } from "../services/money";
 import { formatUzPhone } from "../services/phoneMask";
-import { readTripProfiles, saveTripProfile, type TripProfile, type TripSide } from "../services/tripProfile";
+import type { TripProfile, TripSide } from "../services/tripProfile";
 import type { MapPoint } from "../services/distance";
 import { nearestPlace, placeByName, placeGroups } from "../server/places";
 import { findPlace } from "../services/geo";
@@ -19,40 +19,56 @@ type RiderPane = "home" | "post" | "mine";
 
 export function IntercityScreen({
   onBack,
+  onNeedAccount,
   start = "pick",
   pane = "home",
 }: {
   onBack: () => void;
+  onNeedAccount?: () => void;
   start?: Side;
   pane?: RiderPane;
 }) {
   const t = useT();
+  const { account } = useSession();
   const [side, setSide] = useState<Side>(start);
   const [riderPane, setRiderPane] = useState<RiderPane>(pane);
   const [editing, setEditing] = useState<TripCard | null>(null);
   const [profiles, setProfiles] = useState<Partial<Record<TripSide, TripProfile>>>({});
   const [loaded, setLoaded] = useState(false);
+  const [tripError, setTripError] = useState<string | null>(null);
   const [signing, setSigning] = useState<TripSide | null>(null);
   const rider = profiles.rider ?? null;
 
   useEffect(() => {
-    void readTripProfiles().then((saved) => {
-      setProfiles(saved);
-      const savedSide = start === "rider" ? saved.rider : null;
-      const missing = start === "rider" && (!savedSide || !savedSide.token);
-      if (missing) setSigning("rider");
+    let stop = false;
+    if (!account) {
       setLoaded(true);
-    });
-  }, [start]);
-
-  function choose() {
-    const saved = profiles.rider;
-    if (saved?.token) {
-      setSigning(null);
-      setSide("rider");
       return;
     }
-    setSigning("rider");
+    void api.registerTripAccount("rider", account.name, account.phone, null).then((card) => {
+      if (stop) return;
+      setProfiles({
+        rider: { id: card.id, name: account.name, phone: formatUzPhone(account.phone), token: getSessionToken() },
+      });
+      setLoaded(true);
+    }).catch((caught: unknown) => {
+      if (!stop) {
+        setTripError(caught instanceof Error ? caught.message : t("fail.generic"));
+        setLoaded(true);
+      }
+    });
+    return () => {
+      stop = true;
+    };
+  }, [account, t]);
+
+  function choose() {
+    if (!account || !rider) {
+      onNeedAccount?.();
+      return;
+    }
+    setSigning(null);
+    setSide("rider");
   }
 
   function leave() {
@@ -89,14 +105,11 @@ export function IntercityScreen({
             <Choice icon="person" title={t("trip.rider")} body={t("trip.rider_body")} onPress={() => choose()} />
           </View>
         ) : null}
-        {signing === "rider" ? (
-          <TripSignUp
-            onDone={(profile) => {
-              setProfiles((prev) => ({ ...prev, rider: profile }));
-              setSide("rider");
-              setSigning(null);
-            }}
-          />
+        {tripError ? <Text className="mt-3 text-sm text-red-600">{tripError}</Text> : null}
+        {loaded && !account && side === "rider" ? (
+          <Pressable onPress={onNeedAccount} accessibilityRole="button" className="mt-5 items-center rounded-full bg-[#121212] py-4">
+            <Text className="text-base font-bold text-white">{t("profile.need")}</Text>
+          </Pressable>
         ) : null}
         {loaded && !signing && side === "rider" && rider && riderPane === "home" && !editing ? (
           <RiderHome
@@ -218,22 +231,6 @@ function pointOfPlace(name: string): MapPoint | null {
   return place ? { lat: place.lat, lng: place.lng } : null;
 }
 
-function TripSignUp({ onDone }: { onDone: (profile: TripProfile) => void }) {
-  const t = useT();
-  return (
-    <PhoneCodeBox
-      kind="rider"
-        title={t("trip.rider")}
-        onVerified={async (pass) => {
-        const account = await api.registerTripAccount("rider", pass.name, pass.phone, pass.token);
-        const profile = { id: account.id, name: account.name, phone: formatUzPhone(account.phone), token: pass.token };
-        await saveTripProfile("rider", profile);
-        onDone(profile);
-      }}
-    />
-  );
-}
-
 function RiderForm({
   draft = null,
   account,
@@ -244,7 +241,7 @@ function RiderForm({
   onSaved?: () => void;
 }) {
   const t = useT();
-  const [name, setName] = useState(draft?.passengerName || account.name);
+  const name = draft?.passengerName || account.name;
   const phone = account.phone;
   const [fromName, setFromName] = useState(draft?.from ?? "Shahrixon");
   const [toName, setToName] = useState(draft?.to ?? "Toshkent");
@@ -332,9 +329,7 @@ function RiderForm({
 
   return (
     <View className="mt-3">
-      <Field compact label={t("auth.name")} value={name} onChange={setName} placeholder={t("auth.name_ph")} />
-      <Text className="mb-1.5 mt-2 text-sm font-medium text-ink">{t("auth.phone")}</Text>
-      <Text className="rounded-2xl bg-white px-4 py-3 text-base text-ink">{phone}</Text>
+      <Text className="text-sm font-semibold text-ink">{t("profile.using", { name, phone })}</Text>
       <PlacePick compact label={t("trip.from")} value={fromName} onChange={(place, point) => choose("from", place, point)} onHere={() => void useHere()} />
       {hereName ? <Text className="mt-1 text-xs font-semibold text-brand">{t("trip.here_on", { place: hereName })}</Text> : null}
       <PlacePick compact label={t("trip.to")} value={toName} onChange={(place, point) => choose("to", place, point)} />

@@ -29,7 +29,7 @@ export function CityShell() {
   return (
     <View className="flex-1 bg-[#171717]">
       <View className="flex-1">
-        {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} /> : null}
+        {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} onProfile={() => go("profile")} /> : null}
         {tab === "orders" ? <AccountOrders /> : null}
         {tab === "profile" ? <AccountProfile /> : null}
       </View>

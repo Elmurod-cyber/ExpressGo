@@ -4,12 +4,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Screen } from "../components/Screen";
-import { useT } from "../context/Session";
+import { useSession, useT } from "../context/Session";
 import { useArea } from "../context/Area";
 import { matchesArea, placeGroups } from "../server/places";
-import { PhoneCodeBox } from "../components/PhoneCodeBox";
 import { api } from "../services/api";
-import { readBuildProfiles, saveBuildProfile, type BuildProfile, type BuildWho } from "../services/buildProfile";
+import { getSessionToken } from "../services/sessionToken";
+import type { BuildProfile } from "../services/buildProfile";
 import { formatMoney } from "../services/money";
 import { formatUzPhone } from "../services/phoneMask";
 import type { BuilderCard, BuilderKind, BuilderPay, BuilderTerm } from "../types";
@@ -26,21 +26,18 @@ function tradeLabel(t: (key: string) => string, trade: string): string {
   return label === key ? trade : label;
 }
 
-export function BuildScreen({ onBack }: { onBack: () => void }) {
+export function BuildScreen({ onBack, onNeedAccount }: { onBack: () => void; onNeedAccount?: () => void }) {
   const t = useT();
+  const { account } = useSession();
   const [side, setSide] = useState<Side>("entry");
   const [pane, setPane] = useState<Pane>("list");
-  const [profiles, setProfiles] = useState<Partial<Record<BuildWho, BuildProfile>>>({});
   const [kind, setKind] = useState<BuilderKind>("job");
   const [draft, setDraft] = useState<BuilderCard | null>(null);
   const [fromMine, setFromMine] = useState(false);
-  const who: BuildWho = "employer";
-  const profile = profiles[who] ?? null;
+  const profile: BuildProfile | null = account
+    ? { name: account.name, phone: formatUzPhone(account.phone), token: getSessionToken() }
+    : null;
   const ownKind: BuilderKind = "job";
-
-  useEffect(() => {
-    void readBuildProfiles().then(setProfiles);
-  }, []);
 
   function leave() {
     if (pane === "form") {
@@ -63,9 +60,12 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
   }
 
   function enter() {
-    const saved = profiles.employer;
+    if (!profile) {
+      onNeedAccount?.();
+      return;
+    }
     setSide("hire");
-    setPane(saved?.token ? "list" : "signup");
+    setPane("list");
   }
 
   function openForm(nextKind: BuilderKind, nextDraft: BuilderCard | null, mine: boolean) {
@@ -84,17 +84,6 @@ export function BuildScreen({ onBack }: { onBack: () => void }) {
         </Pressable>
 
         {side === "entry" ? <BuildEntry onHire={() => enter()} /> : null}
-
-        {side !== "entry" && pane === "signup" ? (
-          <BuildSignUp
-            title={t("build.hire")}
-            onSave={async (next) => {
-              await saveBuildProfile(who, next);
-              setProfiles((prev) => ({ ...prev, [who]: next }));
-              setPane("list");
-            }}
-          />
-        ) : null}
 
         {side === "hire" && pane === "list" && profile ? (
           <Board
@@ -196,26 +185,6 @@ function PublicAds() {
         shown.map((card) => <AdCard key={card.id} card={card} />)
       )}
     </View>
-  );
-}
-
-function BuildSignUp({
-  title,
-  onSave,
-}: {
-  title: string;
-  onSave: (profile: BuildProfile) => Promise<void>;
-}) {
-  const t = useT();
-  return (
-    <PhoneCodeBox
-      kind="employer"
-      title={title}
-      tone="orange"
-      onVerified={async (pass) => {
-        await onSave({ name: pass.name, phone: formatUzPhone(pass.phone), token: pass.token });
-      }}
-    />
   );
 }
 
@@ -376,7 +345,7 @@ function AdForm({
   onDone: () => void;
 }) {
   const t = useT();
-  const [name, setName] = useState(draft?.name || ownerName);
+  const name = draft?.name || ownerName;
   const [phone] = useState(formatUzPhone(ownerPhone));
   const [trade, setTrade] = useState(TRADES.includes(draft?.trade as (typeof TRADES)[number]) ? (draft?.trade ?? "") : draft?.trade ? "other" : "");
   const [custom, setCustom] = useState(draft && !TRADES.includes(draft.trade as (typeof TRADES)[number]) ? draft.trade : "");
@@ -463,11 +432,7 @@ function AdForm({
   return (
     <View>
       <Text className="text-2xl font-bold text-ink">{kind === "offer" ? t("build.offer_btn") : t("build.post_job")}</Text>
-      <Field label={t("auth.name")} value={name} onChange={setName} placeholder={t("auth.name_ph")} />
-      <View className="mt-2">
-        <Text className="mb-1 text-sm font-medium text-ink">{t("auth.phone")}</Text>
-        <Text className="rounded-2xl border border-line bg-[#F8FAFC] px-3 py-2.5 text-base text-ink">{phone}</Text>
-      </View>
+      <Text className="mt-2 text-sm font-semibold text-ink">{t("profile.using", { name, phone })}</Text>
       <Text className="mb-1 mt-3 text-sm font-medium text-ink">{t("build.trade")}</Text>
       <Pressable
         onPress={() => setTradeOpen((value) => !value)}

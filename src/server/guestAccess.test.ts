@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { actorStore } from "./actorContext";
 import {
   cancelMyFood,
   listMyFood,
@@ -47,6 +48,42 @@ test("yo'lovchi va ish beruvchi kodsiz kira olmaydi", async () => {
   const rider = await pass("rider", "998900000041", "Ali");
   const account = registerTripAccount("rider", "Ali", "998900000099", rider.token);
   assert.equal(account.phone.endsWith("41"), true);
+});
+
+test("kirgan hisob qayta kod so'ramaydi", async () => {
+  const actor = { id: "u-profile", role: "sender" as const, phone: "998900000155", name: "Nodir", isAdmin: false };
+  await actorStore.run(actor, async () => {
+    const ticket = await placeFoodOrder({
+      placeId: "shahrixon",
+      placeName: "Shahrixon Fastfood",
+      pickup: "Asaka 6",
+      staffPhone: "998902223377",
+      name: "Boshqa",
+      phone: "998900000199",
+      dropoff: "Asaka 6",
+      handoff: "pickup",
+      lines: [{ name: "Lavash", qty: 1, price: 28000 }],
+      guestToken: "",
+    });
+    assert.match(ticket.customerPhone.replace(/\D/g, ""), /155$/);
+    const card = await postBuilder({
+      kind: "job",
+      name: "Nodir",
+      phone: "998900000199",
+      trade: "plumb",
+      region: "Andijon",
+      area: "Shahrixon",
+      address: "Bog 2",
+      text: "Santexnik kerak, bugun.",
+      payKind: "deal",
+      term: "day",
+      workers: 1,
+      guestToken: "",
+    });
+    assert.match(card.phone.replace(/\D/g, ""), /155$/);
+    const trip = registerTripAccount("rider", "Nodir", "998900000199", null);
+    assert.match(trip.phone, /155$/);
+  });
 });
 
 test("taom zakazi tasdiqlangan telefonga yoziladi va yangisigina tahrirlanadi", async () => {
