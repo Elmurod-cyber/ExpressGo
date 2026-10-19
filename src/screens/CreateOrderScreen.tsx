@@ -49,8 +49,6 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapPickerHandle>(null);
   const pickupPoint = useRef<MapPoint | null>(null);
-  const [query, setQuery] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
   const [item, setItem] = useState(draft?.item ?? "");
   const [pickup, setPickup] = useState(draft?.pickup ?? "");
   const [stops, setStops] = useState<DraftStop[]>(() => seedStops(draft));
@@ -74,12 +72,8 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
   const [busy, setBusy] = useState(false);
   const [finding, setFinding] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  const [hits, setHits] = useState<PlaceHit[]>([]);
-  const [hitQuery, setHitQuery] = useState("");
   const [dropFocus, setDropFocus] = useState<number | null>(null);
   const [dropHits, setDropHits] = useState<PlaceHit[]>([]);
-  const skipSearch = useRef(false);
   const skipDropText = useRef<string | null>(null);
   const dropBlur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropToken = useRef(0);
@@ -94,10 +88,6 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     }
     setRouteTick((tick) => tick + 1);
     mapRef.current?.show(point);
-  }
-
-  function searchBias(mode: PinMode): MapPoint | null {
-    return mode === "pickup" ? stops.find((stop) => stop.point)?.point ?? null : pickupPoint.current;
   }
 
   const dropText = dropFocus == null ? "" : (stops[dropFocus]?.label ?? "");
@@ -165,42 +155,6 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
     }, 250);
   }
 
-  async function chooseHit(hit: PlaceHit) {
-    skipSearch.current = true;
-    setHits([]);
-    setHitQuery("");
-    setQuery("");
-    setError(null);
-    Keyboard.dismiss();
-    keepFoundPlace(hit);
-    await applyPoint(hit.point, pin, hit.label);
-  }
-
-  async function runSearch() {
-    const text = query.trim();
-    if (text.length < 2) {
-      setError("Manzil yozing, keyin qidiring.");
-      return;
-    }
-    if (hits[0] && hitQuery === text) {
-      await chooseHit(hits[0]);
-      return;
-    }
-    setSuggesting(true);
-    setError(null);
-    try {
-      const rows = await searchPlaces(text, searchBias(pin));
-      if (!rows[0]) {
-        setHits([]);
-        setError("Manzil topilmadi. Xaritadan belgilang.");
-        return;
-      }
-      await chooseHit(rows[0]);
-    } finally {
-      setSuggesting(false);
-    }
-  }
-
   async function searchText(text: string, mode: PinMode, silent = false) {
     const query = text.trim();
     if (query.length < 2) {
@@ -223,36 +177,6 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
       setFinding(false);
     }
   }
-
-  useEffect(() => {
-    const text = query.trim();
-    if (skipSearch.current) {
-      skipSearch.current = false;
-      return;
-    }
-    if (text.length < 2) {
-      setHits([]);
-      setHitQuery("");
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setSuggesting(true);
-      void searchPlaces(text, searchBias(pin))
-        .then((rows) => {
-          if (cancelled) return;
-          setHits(rows);
-          setHitQuery(text);
-        })
-        .finally(() => {
-          if (!cancelled) setSuggesting(false);
-        });
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [query]);
 
   useEffect(() => {
     const from = pickupPoint.current;
@@ -400,38 +324,7 @@ export function CreateOrderScreen({ onDone, mode = "create", draft = null }: Cre
       <View className="px-4 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 28) + 16 }}>
         <View className="flex-row items-center">
           <BrandMark />
-          <View className="ml-3 h-11 flex-1 flex-row items-center rounded-full bg-card px-3">
-            <Pressable
-              onPress={() => void runSearch()}
-              disabled={suggesting}
-              accessibilityRole="button"
-              accessibilityLabel={t("create.search")}
-            >
-              {suggesting ? <ActivityIndicator size="small" color="#98A2B3" /> : <Ionicons name="search" size={16} color="#98A2B3" />}
-            </Pressable>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t("create.search_ph")}
-              placeholderTextColor="#98A2B3"
-              returnKeyType="search"
-              onSubmitEditing={() => void runSearch()}
-              className="ml-2 flex-1 py-2 text-sm text-ink"
-            />
-            {query.trim() ? (
-              <ClearButton
-                onPress={() => {
-                  skipSearch.current = true;
-                  setQuery("");
-                  setHits([]);
-                  setHitQuery("");
-                }}
-              />
-            ) : null}
-          </View>
         </View>
-        {hits.length > 0 ? <PlaceList hits={hits} onPick={(hit) => void chooseHit(hit)} /> : null}
-        {notice ? <Text className="mt-2 text-xs text-muted">{notice}</Text> : null}
 
         <View className="mt-4 rounded-[28px] bg-card p-4">
           <View className="flex-row items-start justify-between">
