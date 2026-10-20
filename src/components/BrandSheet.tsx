@@ -40,20 +40,31 @@ export function BrandSheet() {
         <Pressable onPress={close} accessibilityRole="button" style={{ flex: 1 }}>
           <Animated.View
             style={{
-              marginTop: insets.top + 4,
-              marginLeft: 76,
+              marginTop: insets.top + 8,
+              marginLeft: 0,
+              width: "86%",
               opacity: progress,
-              transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-36, 0] }) }],
+              transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-48, 0] }) }],
             }}
           >
-            <Pressable accessibilityRole="none" className="w-60 rounded-3xl bg-card px-4 py-3" style={{ elevation: 8 }}>
+            <Pressable
+              accessibilityRole="none"
+              className="bg-card px-5 py-5"
+              style={{
+                elevation: 8,
+                borderTopLeftRadius: 0,
+                borderBottomLeftRadius: 0,
+                borderTopRightRadius: 28,
+                borderBottomRightRadius: 28,
+              }}
+            >
               <Pressable
                 onPress={() => {
                   close();
                   void Linking.openURL(SUPPORT_TEL);
                 }}
                 accessibilityRole="button"
-                className="flex-row items-center py-2"
+                className="flex-row items-center py-3"
               >
                 <Ionicons name="call" size={18} color="#FF8A00" />
                 <View className="ml-3 min-w-0 flex-1">
@@ -62,12 +73,12 @@ export function BrandSheet() {
                 </View>
               </Pressable>
               <View className={`my-1 h-px ${night ? "bg-white/10" : "bg-slate-100"}`} />
-              <View className="py-2">
+              <View className="py-3">
                 <Text className="text-sm font-bold text-ink">{t("brand.about")}</Text>
                 <Text className="text-xs font-semibold text-muted">Express Go · {t("brand.version", { version })}</Text>
               </View>
               <View className={`my-1 h-px ${night ? "bg-white/10" : "bg-slate-100"}`} />
-              <View className="flex-row items-center justify-between py-2">
+              <View className="flex-row items-center justify-between py-3">
                 <Text className="text-sm font-bold text-ink">{t("brand.theme")}</Text>
                 <ThemeSwitch compact />
               </View>

@@ -6,6 +6,7 @@ import { Screen } from "../components/Screen";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { useNight } from "../services/theme";
 import { BrandSheet } from "../components/BrandSheet";
+import { ScreenEnter } from "../components/ScreenEnter";
 import { statusLabel } from "../components/orderStatus";
 import { useSession, useT } from "../context/Session";
 import { useArea } from "../context/Area";
@@ -109,23 +110,50 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
   }, [account, nestedApp, onChrome, pickingService]);
 
   if (gate === "sender") {
-    if (account?.role === "sender") return <SenderApp onBack={() => setGate(null)} />;
-    return <RegisterScreen role="sender" onBack={() => setGate(null)} />;
+    if (account?.role === "sender") {
+      return (
+        <ScreenEnter>
+          <SenderApp onBack={() => setGate(null)} />
+        </ScreenEnter>
+      );
+    }
+    return (
+      <ScreenEnter>
+        <RegisterScreen role="sender" onBack={() => setGate(null)} />
+      </ScreenEnter>
+    );
   }
   if (gate === "rider") {
-    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />;
+    return (
+      <ScreenEnter>
+        <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />
+      </ScreenEnter>
+    );
   }
   if (feed === "trips" && tripDoor === "gate") {
-    return <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />;
+    return (
+      <ScreenEnter>
+        <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />
+      </ScreenEnter>
+    );
   }
   if (feed === "food") {
-    return <FoodScreen onBack={() => setFeed("all")} />;
+    return (
+      <ScreenEnter>
+        <FoodScreen onBack={() => setFeed("all")} />
+      </ScreenEnter>
+    );
   }
   if (feed === "builder") {
-    return <BuildScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />;
+    return (
+      <ScreenEnter>
+        <BuildScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />
+      </ScreenEnter>
+    );
   }
   if (feed === "jobs") {
     return (
+      <ScreenEnter>
       <DeliveryEntry
         jobs={localJobs}
         onBack={() => {
@@ -137,10 +165,12 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
       >
         {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} /> : null}
       </DeliveryEntry>
+      </ScreenEnter>
     );
   }
 
   return (
+    <ScreenEnter>
     <Screen compact>
       <StatusBar style={night ? "light" : "dark"} />
       <View className="px-5 pb-6 pt-1">
@@ -322,6 +352,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
         {error ? <Text className="mt-2 text-sm text-[#F04438]">{error}</Text> : null}
       </View>
     </Screen>
+    </ScreenEnter>
   );
 }
 

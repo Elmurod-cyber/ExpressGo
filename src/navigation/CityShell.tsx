@@ -7,6 +7,7 @@ import { useSession, useT } from "../context/Session";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { SenderApp } from "../screens/SenderHomeScreen";
+import { ScreenEnter } from "../components/ScreenEnter";
 
 export function CityShell() {
   const { account } = useSession();
@@ -27,11 +28,11 @@ export function CityShell() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="flex-1">
+      <ScreenEnter key={tab}>
         {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} onProfile={() => go("profile")} /> : null}
         {tab === "orders" ? <AccountOrders /> : null}
         {tab === "profile" ? <AccountProfile onCancel={() => setTab("home")} /> : null}
-      </View>
+      </ScreenEnter>
       {account && chrome ? <CityTabBar tab={tab} onChange={go} /> : null}
     </View>
   );
