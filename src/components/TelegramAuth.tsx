@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState, Linking, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "./Screen";
@@ -9,7 +9,7 @@ import { editUzPhone, formatUzPhone } from "../services/phoneMask";
 import type { Role } from "../types";
 
 type AuthMode = "signup" | "login";
-type Step = "form" | "wait" | "password";
+type Step = "form" | "wait";
 
 type TelegramAuthProps = {
   role: Role;
@@ -24,19 +24,17 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState(formatUzPhone(""));
-  const [password, setPassword] = useState("");
-  const [again, setAgain] = useState("");
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const finishing = useRef(false);
   const signup = mode === "signup";
 
   function resetForm(next: AuthMode) {
+    finishing.current = false;
     setMode(next);
     setStep("form");
     setChallengeId(null);
-    setPassword("");
-    setAgain("");
     setError(null);
   }
 
@@ -44,19 +42,19 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
     await Linking.openURL(`https://t.me/${username}?start=${id}`);
   }
 
-  async function startTelegram(purpose: "signup" | "reset") {
+  async function startTelegram() {
     setBusy(true);
     setError(null);
     try {
-      const row =
-        purpose === "signup"
-          ? await api.beginTelegramSignup({ role, name, phone })
-          : await api.beginPasswordReset({ role, phone });
+      const row = signup
+        ? await api.beginTelegramSignup({ role, name, phone })
+        : await api.beginPasswordReset({ role, phone });
+      finishing.current = false;
       setChallengeId(row.id);
       setStep("wait");
       await openBot(row.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("auth.fail_signup"));
+      setError(caught instanceof Error ? caught.message : t(signup ? "auth.fail_signup" : "auth.fail_login"));
     } finally {
       setBusy(false);
     }
@@ -66,16 +64,24 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
     if (step !== "wait" || !challengeId) return;
     let stop = false;
     async function poll() {
+      if (finishing.current) return;
       try {
         const row = await api.telegramSignupStatus(challengeId!);
-        if (stop) return;
-        if (row.state === "confirmed") setStep("password");
+        if (stop || finishing.current) return;
         if (row.state === "expired") {
           setError(t("otp.fail"));
           setStep("form");
+          return;
         }
-      } catch {
-        // Keyingi urinishda qayta so'raladi.
+        if (row.state !== "confirmed") return;
+        finishing.current = true;
+        const session = signup
+          ? await api.finishTelegramSignup({ id: challengeId! })
+          : await api.finishPasswordReset({ id: challengeId! });
+        if (!stop) await signIn(session.account, session.token);
+      } catch (caught) {
+        finishing.current = false;
+        if (!stop) setError(caught instanceof Error ? caught.message : t("auth.fail_login"));
       }
     }
     void poll();
@@ -88,43 +94,7 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
       clearInterval(timer);
       sub.remove();
     };
-  }, [step, challengeId, t]);
-
-  async function savePassword() {
-    if (!challengeId) return;
-    if (password.trim() !== again.trim()) {
-      setError(t("auth.password_mismatch"));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const session =
-        mode === "signup"
-          ? await api.finishTelegramSignup({ id: challengeId, password })
-          : await api.finishPasswordReset({ id: challengeId, password });
-      await signIn(session.account, session.token);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("auth.fail_signup"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function enter() {
-    setBusy(true);
-    setError(null);
-    try {
-      const session = await api.loginWithPassword({ role, phone, password });
-      await signIn(session.account, session.token);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t("auth.fail_login"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const title = step === "password" ? t("auth.set_password") : signup ? t("auth.signup_title") : t("auth.login_title");
+  }, [step, challengeId, signup, signIn, t]);
 
   return (
     <Screen>
@@ -143,7 +113,7 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
           <View className="mb-5">
             <BrandMark size={88} />
           </View>
-          <Text className="text-center text-3xl font-bold text-ink">{title}</Text>
+          <Text className="text-center text-3xl font-bold text-ink">{signup ? t("auth.signup_title") : t("auth.login_title")}</Text>
           <Text className="mt-2 text-center text-sm text-muted">
             {step === "wait" ? t("auth.telegram_wait") : signup ? t("auth.signup_sender") : t("auth.login_sub")}
           </Text>
@@ -162,37 +132,12 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
               keyboardType="phone-pad"
             />
           ) : null}
-          {step === "form" && !signup ? (
-            <Field label={t("auth.password")} value={password} onChangeText={setPassword} placeholder={t("auth.password_ph")} secure />
-          ) : null}
-          {step === "password" ? (
-            <>
-              <Field label={t("auth.password")} value={password} onChangeText={setPassword} placeholder={t("auth.password_ph")} secure />
-              <Field label={t("auth.password_again")} value={again} onChangeText={setAgain} placeholder={t("auth.password_ph")} secure />
-            </>
-          ) : null}
           {error ? <Text className="mb-4 text-sm text-red-600">{error}</Text> : null}
-
-          {step === "form" && signup ? (
-            <DarkButton label={busy ? t("auth.wait") : t("auth.telegram")} disabled={busy} onPress={() => void startTelegram("signup")} />
-          ) : null}
-          {step === "form" && !signup ? (
-            <>
-              <DarkButton label={busy ? t("auth.wait") : t("auth.login")} disabled={busy || password.trim().length < 6} onPress={() => void enter()} />
-              <Pressable onPress={() => void startTelegram("reset")} disabled={busy} accessibilityRole="button" className="mt-4 items-center py-2">
-                <Text className="text-sm font-semibold text-ink">{t("auth.forgot")}</Text>
-              </Pressable>
-            </>
+          {step === "form" ? (
+            <DarkButton label={busy ? t("auth.wait") : t("auth.telegram")} disabled={busy} onPress={() => void startTelegram()} />
           ) : null}
           {step === "wait" && challengeId ? (
             <DarkButton label={t("auth.telegram_open")} disabled={false} onPress={() => void openBot(challengeId)} />
-          ) : null}
-          {step === "password" ? (
-            <DarkButton
-              label={busy ? t("auth.wait") : t("auth.set_password")}
-              disabled={busy || password.trim().length < 6 || again.trim().length < 6}
-              onPress={() => void savePassword()}
-            />
           ) : null}
         </View>
 
@@ -215,14 +160,12 @@ function Field({
   onChangeText,
   placeholder,
   keyboardType,
-  secure,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
   keyboardType?: "phone-pad";
-  secure?: boolean;
 }) {
   return (
     <View className="mb-4">
@@ -233,7 +176,6 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor="#98A2B3"
         keyboardType={keyboardType}
-        secureTextEntry={secure}
         autoCapitalize="none"
         className="rounded-2xl border border-line bg-canvas px-4 py-3.5 text-base text-ink"
       />

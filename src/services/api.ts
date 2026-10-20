@@ -161,12 +161,12 @@ export const api = {
       throw new Error(t("delivery.server_need"));
     });
   },
-  finishTelegramSignup(input: { id: string; password: string }): Promise<AuthSession> {
+  finishTelegramSignup(input: { id: string; password?: string }): Promise<AuthSession> {
     return invoke("finishTelegramSignup", [input], () => {
       throw new Error(t("delivery.server_need"));
     });
   },
-  finishPasswordReset(input: { id: string; password: string }): Promise<AuthSession> {
+  finishPasswordReset(input: { id: string; password?: string }): Promise<AuthSession> {
     return invoke("finishPasswordReset", [input], () => {
       throw new Error(t("delivery.server_need"));
     });

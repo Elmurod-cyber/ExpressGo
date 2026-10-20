@@ -16,7 +16,6 @@ import {
   confirmLoginContact,
   finishPasswordReset,
   finishTelegramSignup,
-  loginWithPassword,
   adminBoard,
   courierBoard,
   declineDelivery,
@@ -432,18 +431,18 @@ test("telegram raqami mos kelsa parol bilan kiriladi", async () => {
     assert.equal(await confirmLoginContact(42, "998900000099", true), "mismatch");
     assert.equal(await confirmLoginContact(42, "+998900000081", false), "mismatch");
     assert.equal(await confirmLoginContact(42, "+998 90 000 00 81", true), "ok");
-    const session = await finishTelegramSignup({ id: challenge.id, password: "sir123" });
+    const session = await finishTelegramSignup({ id: challenge.id });
     assert.equal(session.account.name, "Lola");
-    await assert.rejects(() => loginWithPassword({ role: "sender", phone: "998900000081", password: "wrong1" }), /noto'g'ri/);
-    const again = await loginWithPassword({ role: "sender", phone: "998900000081", password: "sir123" });
+    const returned = await beginTelegramSignup({ role: "sender", name: "Lola", phone: "998900000081" });
+    assert.equal(await attachLoginChat(returned.id, 43), true);
+    assert.equal(await confirmLoginContact(43, "998900000081", true), "ok");
+    const again = await finishTelegramSignup({ id: returned.id });
     assert.equal(again.account.id, session.account.id);
     const reset = await beginPasswordReset({ role: "sender", phone: "998900000081" });
     assert.equal(await attachLoginChat(reset.id, 77), true);
     assert.equal(await confirmLoginContact(77, "998900000081", true), "ok");
-    await finishPasswordReset({ id: reset.id, password: "next123" });
-    await assert.rejects(() => loginWithPassword({ role: "sender", phone: "998900000081", password: "sir123" }), /noto'g'ri/);
-    const next = await loginWithPassword({ role: "sender", phone: "998900000081", password: "next123" });
-    assert.ok(next.token);
+    const next = await finishPasswordReset({ id: reset.id });
+    assert.equal(next.account.id, session.account.id);
   } finally {
     if (prevToken === undefined) delete process.env.TELEGRAM_LOGIN_BOT_TOKEN;
     else process.env.TELEGRAM_LOGIN_BOT_TOKEN = prevToken;

@@ -444,17 +444,6 @@ function sameTail(left: string, right: string): boolean {
   return a.length === 9 && a === b;
 }
 
-function cleanPassword(value: string): string {
-  const password = value.trim();
-  if (password.length < 6 || password.length > 64) fail("Parol kamida 6 ta belgi bo'lsin.");
-  return password;
-}
-
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  return `${salt}:${sha256(salt + password)}`;
-}
-
 function checkPassword(password: string, stored: string | null | undefined): boolean {
   if (!stored) return false;
   const split = stored.indexOf(":");
@@ -501,7 +490,6 @@ export async function beginTelegramSignup(input: { role: Role | string; name: st
   const phone = digits(input.phone);
   if (name.length < 2) fail("Ismingizni yozing.");
   if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
-  if (await repo().readUserByPhone(phone, role)) fail("Bu telefon allaqachon ro'yxatdan o'tgan. Kirishni tanlang.");
   return freshChallenge({ phone, role, purpose: "signup", name });
 }
 
@@ -539,26 +527,26 @@ export async function confirmLoginContact(chatId: number, phone: string, own: bo
   return "ok";
 }
 
-export async function finishTelegramSignup(input: { id: string; password: string }): Promise<{ account: Account; token: string }> {
-  const row = liveChallenge(await repo().readLoginChallenge(input.id.trim()));
-  if (row.purpose !== "signup" || !row.confirmed) fail("Avval Telegramda raqamni yuboring.");
-  const password = cleanPassword(input.password);
-  if (await repo().readUserByPhone(row.phone, row.role)) fail("Bu telefon allaqachon ro'yxatdan o'tgan. Kirishni tanlang.");
+async function openConfirmed(row: LoginChallenge): Promise<{ account: Account; token: string }> {
+  if (!row.confirmed) fail("Avval Telegramda raqamni yuboring.");
+  const existing = await repo().readUserByPhone(row.phone, row.role);
+  if (existing) return openSession(existing);
+  if (row.purpose !== "signup") fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
   const user = blankUser({ role: row.role, name: row.name, phone: row.phone, vehicle: null });
-  user.passwordHash = hashPassword(password);
   user.phoneVerified = true;
   return openSession(user);
 }
 
-export async function finishPasswordReset(input: { id: string; password: string }): Promise<{ account: Account; token: string }> {
+export async function finishTelegramSignup(input: { id: string; password?: string }): Promise<{ account: Account; token: string }> {
   const row = liveChallenge(await repo().readLoginChallenge(input.id.trim()));
-  if (row.purpose !== "reset" || !row.confirmed) fail("Avval Telegramda raqamni yuboring.");
-  const password = cleanPassword(input.password);
-  const user = await repo().readUserByPhone(row.phone, row.role);
-  if (!user) fail("Bu telefon bilan hisob topilmadi. Avval ro'yxatdan o'ting.");
-  user.passwordHash = hashPassword(password);
-  await repo().deleteSessionsForUser(user.id);
-  return openSession(user);
+  if (row.purpose !== "signup") fail("Avval Telegramda raqamni yuboring.");
+  return openConfirmed(row);
+}
+
+export async function finishPasswordReset(input: { id: string; password?: string }): Promise<{ account: Account; token: string }> {
+  const row = liveChallenge(await repo().readLoginChallenge(input.id.trim()));
+  if (row.purpose !== "reset") fail("Avval Telegramda raqamni yuboring.");
+  return openConfirmed(row);
 }
 
 export async function loginWithPassword(input: { role: Role | string; phone: string; password: string }): Promise<{ account: Account; token: string }> {

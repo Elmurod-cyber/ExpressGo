@@ -94,7 +94,7 @@ async function onLoginMessage(chatId: number, message: LoginMessage): Promise<vo
     const result = await confirmLoginContact(chatId, contact, own);
     const text =
       result === "ok"
-        ? "Raqam tasdiqlandi. Ilovaga qayting va parol qo'ying."
+        ? "Raqam tasdiqlandi. Ilovaga qayting."
         : result === "mismatch"
           ? "Bu raqam ilovada yozilgan raqam emas. Ilovadagi telefon bilan shu tugmani bosing."
           : "Avval ilovadagi Telegram tugmasini bosing.";
