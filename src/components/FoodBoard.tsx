@@ -12,9 +12,10 @@ import { formatMoney } from "../services/money";
 import { useNight } from "../services/theme";
 import { formatUzPhone } from "../services/phoneMask";
 import { useSession, useT } from "../context/Session";
+import { RegisterScreen } from "../screens/RegisterScreen";
 import type { FoodTicket, KitchenDesk } from "../types";
 
-export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNeedAccount?: () => void }) {
+export function FoodScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
   const { account } = useSession();
   const customer: FoodProfile | null = account
@@ -27,6 +28,7 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
   const [profileReady, setProfileReady] = useState(false);
   const [cart, setCart] = useState<FoodCartSnap>({ restaurantId: "", items: {} });
   const [openCart, setOpenCart] = useState(false);
+  const [askLogin, setAskLogin] = useState(false);
   const cartCount = Object.values(cart.items).reduce((sum, qty) => sum + qty, 0);
   useEffect(() => {
     let stop = false;
@@ -54,6 +56,9 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
       return { restaurantId, items };
     });
   }
+  if (askLogin && !account) {
+    return <RegisterScreen role="sender" onBack={() => setAskLogin(false)} />;
+  }
   const place = FOOD_PLACES.find((item) => item.id === placeId) ?? null;
   if (place) {
     return (
@@ -65,7 +70,6 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
         onCartOpened={() => setOpenCart(false)}
         onCartChange={(dishId, next) => changeCart(place.id, dishId, next)}
         onCartClear={() => setCart({ restaurantId: place.id, items: {} })}
-        onNeedAccount={onNeedAccount}
         onBack={() => setPlaceId(null)}
       />
     );
@@ -123,7 +127,7 @@ export function FoodScreen({ onBack, onNeedAccount }: { onBack: () => void; onNe
             </Pressable>
           ) : null}
         </Pressable>
-        {customer ? <FoodMine token={customer.token} onExpired={() => onNeedAccount?.()} /> : null}
+        {customer ? <FoodMine token={customer.token} onExpired={() => setAskLogin(true)} /> : null}
         {places.length === 0 ? <Text className="mt-4 text-sm text-muted">{t("food.find_empty")}</Text> : null}
         {places.map((item) => (
           <Pressable
@@ -164,7 +168,6 @@ function PlaceMenu({
   onCartOpened,
   onCartChange,
   onCartClear,
-  onNeedAccount,
 }: {
   place: FoodPlace;
   onBack: () => void;
@@ -174,7 +177,6 @@ function PlaceMenu({
   onCartOpened: () => void;
   onCartChange: (dishId: string, next: number) => void;
   onCartClear: () => void;
-  onNeedAccount?: () => void;
 }) {
   const t = useT();
   const pageScroll = useRef<ScrollView>(null);
@@ -187,6 +189,7 @@ function PlaceMenu({
   const [sent, setSent] = useState(false);
   const [accepting, setAccepting] = useState(true);
   const [tracked, setTracked] = useState<FoodTicket | null>(null);
+  const [askLogin, setAskLogin] = useState(false);
   const digits = place.phone.replace(/\D/g, "");
   const lines = place.dishes
     .map((dish) => ({ dish, qty: cart[dish.id] ?? 0 }))
@@ -286,8 +289,7 @@ function PlaceMenu({
       return;
     }
     if (!customer) {
-      setError(t("profile.need"));
-      onNeedAccount?.();
+      setAskLogin(true);
       return;
     }
     setBusy(true);
@@ -298,7 +300,7 @@ function PlaceMenu({
         placeName: place.name,
         pickup: place.address,
         staffPhone: place.phone,
-        name: customer.name,
+        name: customer.name.trim().length >= 2 ? customer.name : "Mijoz",
         phone: customer.phone,
         dropoff: handoff === "pickup" ? place.address : dropoff,
         handoff,
@@ -313,11 +315,15 @@ function PlaceMenu({
       setChoice(null);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : t("fail.generic");
-      if (message.includes("Telefon tasdiqlanmagan")) onNeedAccount?.();
+      if (message.includes("Telefon tasdiqlanmagan")) setAskLogin(true);
       setError(message);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (askLogin && !customer) {
+    return <RegisterScreen role="sender" onBack={() => setAskLogin(false)} />;
   }
 
   return (
@@ -390,11 +396,7 @@ function PlaceMenu({
             </View>
             {customer ? (
               <Text className="mt-3 text-sm font-semibold text-ink">{t("profile.using", { name: customer.name, phone: formatUzPhone(customer.phone) })}</Text>
-            ) : (
-              <Pressable onPress={onNeedAccount} accessibilityRole="button" className="mt-3 items-center rounded-2xl bg-[#121212] py-3">
-                <Text className="text-sm font-bold text-white">{t("profile.need")}</Text>
-              </Pressable>
-            )}
+            ) : null}
             <TextInput
               value={dropoff}
               onChangeText={setDropoff}

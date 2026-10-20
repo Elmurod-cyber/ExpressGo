@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { Screen } from "../components/Screen";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { useNight } from "../services/theme";
-import { BrandMark } from "../components/BrandMark";
+import { BrandSheet } from "../components/BrandSheet";
 import { statusLabel } from "../components/orderStatus";
 import { useSession, useT } from "../context/Session";
 import { useArea } from "../context/Area";
@@ -113,13 +113,13 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
     return <RegisterScreen role="sender" onBack={() => setGate(null)} />;
   }
   if (gate === "rider") {
-    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} onNeedAccount={onProfile} />;
+    return <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />;
   }
   if (feed === "trips" && tripDoor === "gate") {
     return <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />;
   }
   if (feed === "food") {
-    return <FoodScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />;
+    return <FoodScreen onBack={() => setFeed("all")} />;
   }
   if (feed === "builder") {
     return <BuildScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />;
@@ -145,7 +145,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
       <StatusBar style={night ? "light" : "dark"} />
       <View className="px-5 pb-6 pt-1">
         <View className="flex-row items-center">
-          <BrandMark size={52} />
+          <BrandSheet />
           <View className="ml-2.5 min-w-0 flex-1">
             <Text className="text-xl font-bold text-ink" numberOfLines={1}>
               Express Go

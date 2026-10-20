@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -12,6 +12,7 @@ import type { TripProfile, TripSide } from "../services/tripProfile";
 import type { MapPoint } from "../services/distance";
 import { nearestPlace, placeByName, placeGroups } from "../server/places";
 import { findPlace } from "../services/geo";
+import { RegisterScreen } from "./RegisterScreen";
 import type { TripCard } from "../types";
 
 type Side = "pick" | "rider";
@@ -19,12 +20,10 @@ type RiderPane = "home" | "post" | "mine";
 
 export function IntercityScreen({
   onBack,
-  onNeedAccount,
   start = "pick",
   pane = "home",
 }: {
   onBack: () => void;
-  onNeedAccount?: () => void;
   start?: Side;
   pane?: RiderPane;
 }) {
@@ -37,6 +36,8 @@ export function IntercityScreen({
   const [loaded, setLoaded] = useState(false);
   const [tripError, setTripError] = useState<string | null>(null);
   const [signing, setSigning] = useState<TripSide | null>(null);
+  const [askLogin, setAskLogin] = useState(false);
+  const pendingPane = useRef<RiderPane | null>(null);
   const rider = profiles.rider ?? null;
 
   useEffect(() => {
@@ -45,10 +46,11 @@ export function IntercityScreen({
       setLoaded(true);
       return;
     }
-    void api.registerTripAccount("rider", account.name, account.phone, null).then((card) => {
+    const name = account.name.trim().length >= 2 ? account.name : "Mijoz";
+    void api.registerTripAccount("rider", name, account.phone, null).then((card) => {
       if (stop) return;
       setProfiles({
-        rider: { id: card.id, name: account.name, phone: formatUzPhone(account.phone), token: getSessionToken() },
+        rider: { id: card.id, name, phone: formatUzPhone(account.phone), token: getSessionToken() },
       });
       setLoaded(true);
     }).catch((caught: unknown) => {
@@ -62,13 +64,26 @@ export function IntercityScreen({
     };
   }, [account, t]);
 
+  useEffect(() => {
+    if (!account || pendingPane.current == null) return;
+    setRiderPane(pendingPane.current);
+    pendingPane.current = null;
+    setAskLogin(false);
+  }, [account]);
+
   function choose() {
-    if (!account || !rider) {
-      onNeedAccount?.();
-      return;
-    }
     setSigning(null);
     setSide("rider");
+  }
+
+  function openRiderPane(next: RiderPane) {
+    if (!account || !rider) {
+      pendingPane.current = next;
+      setAskLogin(true);
+      return;
+    }
+    setEditing(null);
+    setRiderPane(next);
   }
 
   function leave() {
@@ -91,6 +106,18 @@ export function IntercityScreen({
     else setSide(start);
   }
 
+  if (askLogin && !account) {
+    return (
+      <RegisterScreen
+        role="sender"
+        onBack={() => {
+          pendingPane.current = null;
+          setAskLogin(false);
+        }}
+      />
+    );
+  }
+
   return (
     <Screen compact>
       <View className="px-5 pt-2">
@@ -107,9 +134,7 @@ export function IntercityScreen({
         ) : null}
         {tripError ? <Text className="mt-3 text-sm text-red-600">{tripError}</Text> : null}
         {loaded && !account && side === "rider" ? (
-          <Pressable onPress={onNeedAccount} accessibilityRole="button" className="mt-5 items-center rounded-full bg-[#121212] py-4">
-            <Text className="text-base font-bold text-white">{t("profile.need")}</Text>
-          </Pressable>
+          <RiderHome onPost={() => openRiderPane("post")} onMine={() => openRiderPane("mine")} />
         ) : null}
         {loaded && !signing && side === "rider" && rider && riderPane === "home" && !editing ? (
           <RiderHome
