@@ -6,7 +6,7 @@ import { Screen } from "./Screen";
 import { BrandMark } from "./BrandMark";
 import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
-import { cardPhoneApply, cardPhoneCaret, cardPhoneMask, cardPhoneValue } from "../services/phoneMask";
+import { cardPhoneApplyAt, cardPhoneCaretAt, cardPhoneMask, cardPhoneValue, cardSlotAt } from "../services/phoneMask";
 import { useKeyboardOverlap } from "../services/keyboardInset";
 import type { Role } from "../types";
 
@@ -31,12 +31,8 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
   const finishing = useRef(false);
   const mask = cardPhoneMask(digits);
   const fieldValue = cardPhoneValue(digits);
-  const caret = cardPhoneCaret(digits.length);
-  const [selection, setSelection] = useState(caret);
-
-  useEffect(() => {
-    setSelection(cardPhoneCaret(digits.length));
-  }, [digits]);
+  const slotRef = useRef(0);
+  const [selection, setSelection] = useState(cardPhoneCaretAt(0));
 
   async function openBot(id: string) {
     await Linking.openURL(`https://t.me/${username}?start=${id}`);
@@ -94,7 +90,7 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
   }, [step, challengeId, signIn, t]);
 
   const bottom = Math.max(insets.bottom, 16) + overlap;
-  const cut = digits.length >= 9 ? mask.length : caret.start;
+  const cut = cardPhoneCaretAt(digits.length).start;
 
   return (
     <Screen
@@ -131,22 +127,31 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
         {step === "form" ? (
           <View className="mt-8 rounded-[28px] bg-card px-5 py-6">
             <View className="justify-center rounded-2xl border border-line bg-canvas px-4 py-3.5">
-              <Text className="text-base">
+              <Text className="text-base" style={{ fontVariant: ["tabular-nums"] }}>
                 <Text className="text-ink">{mask.slice(0, cut)}</Text>
                 <Text className="text-muted">{mask.slice(cut)}</Text>
               </Text>
               <TextInput
                 value={fieldValue}
-                onChangeText={(next) => setDigits((prev) => cardPhoneApply(prev, next))}
+                onChangeText={(next) => {
+                  setDigits((prev) => {
+                    const edited = cardPhoneApplyAt(prev, next, slotRef.current);
+                    slotRef.current = edited.slot;
+                    setSelection(cardPhoneCaretAt(edited.slot));
+                    return edited.digits;
+                  });
+                }}
                 selection={selection}
                 onSelectionChange={(event) => {
-                  const want = cardPhoneCaret(digits.length);
+                  const place = Math.min(cardSlotAt(event.nativeEvent.selection.start), digits.length);
+                  slotRef.current = place;
+                  const want = cardPhoneCaretAt(place);
                   const got = event.nativeEvent.selection;
                   if (got.start !== want.start || got.end !== want.end) setSelection(want);
                 }}
-                onFocus={() => setSelection(cardPhoneCaret(digits.length))}
+                selectTextOnFocus={false}
                 keyboardType="phone-pad"
-                style={{ position: "absolute", left: 16, right: 16, top: 14, bottom: 14, color: "transparent", fontSize: 16, padding: 0 }}
+                style={{ position: "absolute", left: 16, right: 16, top: 14, bottom: 14, color: "transparent", fontSize: 16, padding: 0, fontVariant: ["tabular-nums"] }}
               />
             </View>
           </View>
