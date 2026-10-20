@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState, Linking, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "./Screen";
 import { BrandMark } from "./BrandMark";
 import { useSession, useT } from "../context/Session";
 import { api } from "../services/api";
-import { editUzPhone, formatUzPhone } from "../services/phoneMask";
+import { cardPhoneApply, cardPhoneCaret, cardPhoneMask, cardPhoneValue } from "../services/phoneMask";
+import { useKeyboardOverlap } from "../services/keyboardInset";
 import type { Role } from "../types";
 
-type AuthMode = "signup" | "login";
 type Step = "form" | "wait";
 
 type TelegramAuthProps = {
@@ -20,41 +21,39 @@ type TelegramAuthProps = {
 export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
   const { signIn } = useSession();
   const t = useT();
-  const [mode, setMode] = useState<AuthMode>("signup");
+  const insets = useSafeAreaInsets();
+  const overlap = useKeyboardOverlap();
   const [step, setStep] = useState<Step>("form");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(formatUzPhone(""));
+  const [digits, setDigits] = useState("");
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const finishing = useRef(false);
-  const signup = mode === "signup";
+  const mask = cardPhoneMask(digits);
+  const fieldValue = cardPhoneValue(digits);
+  const caret = cardPhoneCaret(digits.length);
+  const [selection, setSelection] = useState(caret);
 
-  function resetForm(next: AuthMode) {
-    finishing.current = false;
-    setMode(next);
-    setStep("form");
-    setChallengeId(null);
-    setError(null);
-  }
+  useEffect(() => {
+    setSelection(cardPhoneCaret(digits.length));
+  }, [digits]);
 
   async function openBot(id: string) {
     await Linking.openURL(`https://t.me/${username}?start=${id}`);
   }
 
   async function startTelegram() {
+    if (digits.length < 9) return;
     setBusy(true);
     setError(null);
     try {
-      const row = signup
-        ? await api.beginTelegramSignup({ role, name, phone })
-        : await api.beginPasswordReset({ role, phone });
+      const row = await api.beginTelegramSignup({ role, name: "Mijoz", phone: `998${digits}` });
       finishing.current = false;
       setChallengeId(row.id);
       setStep("wait");
       await openBot(row.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t(signup ? "auth.fail_signup" : "auth.fail_login"));
+      setError(caught instanceof Error ? caught.message : t("auth.fail_signup"));
     } finally {
       setBusy(false);
     }
@@ -75,9 +74,7 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
         }
         if (row.state !== "confirmed") return;
         finishing.current = true;
-        const session = signup
-          ? await api.finishTelegramSignup({ id: challengeId! })
-          : await api.finishPasswordReset({ id: challengeId! });
+        const session = await api.finishTelegramSignup({ id: challengeId! });
         if (!stop) await signIn(session.account, session.token);
       } catch (caught) {
         finishing.current = false;
@@ -94,104 +91,67 @@ export function TelegramAuth({ role, username, onBack }: TelegramAuthProps) {
       clearInterval(timer);
       sub.remove();
     };
-  }, [step, challengeId, signup, signIn, t]);
+  }, [step, challengeId, signIn, t]);
+
+  const bottom = Math.max(insets.bottom, 16) + overlap;
+  const cut = digits.length >= 9 ? mask.length : caret.start;
 
   return (
-    <Screen>
-      <View className="px-5 pt-2">
+    <Screen
+      footer={
+        <View className="px-5" style={{ paddingBottom: bottom }}>
+          <View className="rounded-[28px] bg-card px-5 py-4">
+            {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
+            <Pressable
+              onPress={step === "wait" && challengeId ? () => void openBot(challengeId) : () => void startTelegram()}
+              disabled={step === "form" && (busy || digits.length < 9)}
+              accessibilityRole="button"
+              className={`items-center rounded-2xl py-4 ${step === "form" && (busy || digits.length < 9) ? "bg-slate-200" : "bg-[#121212] active:opacity-90"}`}
+            >
+              <Text
+                className={`text-base font-semibold ${step === "form" && (busy || digits.length < 9) ? "text-slate-500" : "text-white"}`}
+              >
+                {busy ? t("auth.wait") : step === "wait" ? t("auth.telegram_open") : t("auth.telegram")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      }
+    >
+      <View className="flex-1 px-5 pt-2">
         <View className="flex-row justify-end">
-          <Pressable
-            onPress={step === "form" ? onBack : () => resetForm(mode)}
-            accessibilityRole="button"
-            accessibilityLabel={t("close")}
-            className="h-10 w-10 items-center justify-center"
-          >
+          <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t("close")} className="h-10 w-10 items-center justify-center">
             <Ionicons name="close" size={22} color="#98A2B3" />
           </Pressable>
         </View>
         <View className="items-center">
-          <View className="mb-5">
-            <BrandMark size={88} />
-          </View>
-          <Text className="text-center text-3xl font-bold text-ink">{signup ? t("auth.signup_title") : t("auth.login_title")}</Text>
-          <Text className="mt-2 text-center text-sm text-muted">
-            {step === "wait" ? t("auth.telegram_wait") : signup ? t("auth.signup_sender") : t("auth.login_sub")}
-          </Text>
+          <BrandMark size={88} />
+          {step === "wait" ? <Text className="mt-6 text-center text-sm text-muted">{t("auth.telegram_wait")}</Text> : null}
         </View>
-
-        <View className="mt-6 rounded-[28px] bg-card px-5 py-6">
-          {step === "form" && signup ? (
-            <Field label={t("auth.name")} value={name} onChangeText={setName} placeholder={t("auth.name_ph")} />
-          ) : null}
-          {step === "form" ? (
-            <Field
-              label={t("auth.phone")}
-              value={phone}
-              onChangeText={(value) => setPhone((prev) => editUzPhone(value, prev))}
-              placeholder="+998"
-              keyboardType="phone-pad"
-            />
-          ) : null}
-          {error ? <Text className="mb-4 text-sm text-red-600">{error}</Text> : null}
-          {step === "form" ? (
-            <DarkButton label={busy ? t("auth.wait") : t("auth.telegram")} disabled={busy} onPress={() => void startTelegram()} />
-          ) : null}
-          {step === "wait" && challengeId ? (
-            <DarkButton label={t("auth.telegram_open")} disabled={false} onPress={() => void openBot(challengeId)} />
-          ) : null}
-        </View>
-
         {step === "form" ? (
-          <Pressable onPress={() => resetForm(signup ? "login" : "signup")} accessibilityRole="button" className="mt-6 items-center py-2">
-            <Text className="text-sm text-muted">
-              {signup ? t("auth.have") : t("auth.need")}
-              <Text className="font-semibold text-ink">{signup ? t("auth.login") : t("auth.create")}</Text>
-            </Text>
-          </Pressable>
+          <View className="mt-8 rounded-[28px] bg-card px-5 py-6">
+            <View className="justify-center rounded-2xl border border-line bg-canvas px-4 py-3.5">
+              <Text className="text-base">
+                <Text className="text-ink">{mask.slice(0, cut)}</Text>
+                <Text className="text-muted">{mask.slice(cut)}</Text>
+              </Text>
+              <TextInput
+                value={fieldValue}
+                onChangeText={(next) => setDigits((prev) => cardPhoneApply(prev, next))}
+                selection={selection}
+                onSelectionChange={(event) => {
+                  const want = cardPhoneCaret(digits.length);
+                  const got = event.nativeEvent.selection;
+                  if (got.start !== want.start || got.end !== want.end) setSelection(want);
+                }}
+                onFocus={() => setSelection(cardPhoneCaret(digits.length))}
+                keyboardType="phone-pad"
+                style={{ position: "absolute", left: 16, right: 16, top: 14, bottom: 14, color: "transparent", fontSize: 16, padding: 0 }}
+              />
+            </View>
+          </View>
         ) : null}
       </View>
     </Screen>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  keyboardType?: "phone-pad";
-}) {
-  return (
-    <View className="mb-4">
-      <Text className="mb-2 text-sm font-medium text-ink">{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#98A2B3"
-        keyboardType={keyboardType}
-        autoCapitalize="none"
-        className="rounded-2xl border border-line bg-canvas px-4 py-3.5 text-base text-ink"
-      />
-    </View>
-  );
-}
-
-function DarkButton({ label, disabled, onPress }: { label: string; disabled: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      className={`items-center rounded-2xl py-4 ${disabled ? "bg-slate-200" : "bg-[#121212] active:opacity-90"}`}
-    >
-      <Text className={`text-base font-semibold ${disabled ? "text-slate-500" : "text-white"}`}>{label}</Text>
-    </Pressable>
   );
 }

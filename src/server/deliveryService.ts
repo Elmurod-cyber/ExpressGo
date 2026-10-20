@@ -486,9 +486,9 @@ function liveChallenge(row: LoginChallenge | null): LoginChallenge {
 export async function beginTelegramSignup(input: { role: Role | string; name: string; phone: string }): Promise<LoginChallenge> {
   if (authMethod().mode !== "telegram") fail("Telegram tasdig'i hali yoqilmagan.");
   const role = assertRole(input.role);
-  const name = input.name.trim();
+  const typedName = input.name.trim();
+  const name = typedName.length >= 2 ? typedName : "Mijoz";
   const phone = digits(input.phone);
-  if (name.length < 2) fail("Ismingizni yozing.");
   if (phone.length < 9) fail("Telefon raqamini to'liq yozing.");
   return freshChallenge({ phone, role, purpose: "signup", name });
 }
