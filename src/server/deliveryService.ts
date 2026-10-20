@@ -27,6 +27,7 @@ import {
   PING_MS,
   matchRadiusKm,
   DOC_LABEL,
+  COURIER_GIFT_SOM,
 } from "./rules";
 import type {
   Account,
@@ -154,13 +155,15 @@ function applyServerAdmin(user: DeliveryUser): boolean {
 
 function blankUser(input: { role: Role; name: string; phone: string; vehicle: VehicleKind | null }): DeliveryUser {
   const now = Date.now();
+  const id = newId("u");
+  const gift = input.role === "courier";
   return {
-    id: newId("u"),
+    id,
     phone: input.phone,
     role: input.role,
     isAdmin: false,
     name: input.name,
-    balance: 0,
+    balance: gift ? COURIER_GIFT_SOM : 0,
     vehicle: input.role === "courier" ? input.vehicle : null,
     shiftOn: false,
     shiftStartedAt: null,
@@ -179,7 +182,20 @@ function blankUser(input: { role: Role; name: string; phone: string; vehicle: Ve
     passportNote: null,
     licenseNote: null,
     vehicleNote: null,
-    ledger: [],
+    ledger: gift
+      ? [
+          {
+            id: newId("l"),
+            userId: id,
+            kind: "deposit",
+            amount: COURIER_GIFT_SOM,
+            label: "Ro'yxat hadyasi",
+            jobId: null,
+            at: now,
+            balance: COURIER_GIFT_SOM,
+          },
+        ]
+      : [],
     createdAt: now,
     updatedAt: now,
   };

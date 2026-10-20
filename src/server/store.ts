@@ -249,10 +249,19 @@ export type StoredTrip = {
   at: number;
 };
 
+export type StoredDriverPass = {
+  phone: string;
+  driverId: string;
+  until: number;
+};
+
 export type TripRepository = {
   list(): Promise<StoredTrip[]>;
   upsert(row: StoredTrip): Promise<void>;
   remove(id: string): Promise<void>;
+  listPasses?(): Promise<StoredDriverPass[]>;
+  grantPass?(row: StoredDriverPass): Promise<StoredDriverPass>;
+  renewPass?(row: StoredDriverPass): Promise<void>;
 };
 
 let tripRepo: TripRepository | null = null;
@@ -302,15 +311,39 @@ async function pullTrips() {
   applyStoredTrips(await tripRepo.list());
 }
 
+async function syncDriverPasses(repo: TripRepository): Promise<void> {
+  if (!repo.listPasses || !repo.grantPass) return;
+  const remote = await repo.listPasses();
+  const remoteKeys = new Set(remote.map((row) => phoneKey(row.phone).slice(-9)));
+  for (const row of remote) {
+    const found = tripPasses.find((item) => samePhone(item.phone, row.phone));
+    if (found) {
+      found.until = row.until;
+      found.phone = phoneKey(row.phone);
+      if (row.driverId) found.driverId = row.driverId;
+    } else {
+      tripPasses.push({ phone: phoneKey(row.phone), driverId: row.driverId, until: row.until });
+    }
+  }
+  for (const pass of tripPasses) {
+    if (remoteKeys.has(phoneKey(pass.phone).slice(-9))) continue;
+    const stored = await repo.grantPass(pass);
+    pass.until = stored.until;
+    if (stored.driverId) pass.driverId = stored.driverId;
+  }
+}
+
 export async function useTripRepository(repo: TripRepository): Promise<{ count: number; seeded: boolean }> {
   const remote = await repo.list();
   if (remote.length === 0 && trips.length > 0) {
     for (const trip of trips) await repo.upsert(storedTrip(trip));
     tripRepo = repo;
+    await syncDriverPasses(repo);
     return { count: trips.length, seeded: true };
   }
   applyStoredTrips(remote);
   tripRepo = repo;
+  await syncDriverPasses(repo);
   return { count: trips.length, seeded: false };
 }
 
@@ -331,6 +364,7 @@ export type StoredConstructionJob = {
   workers: number;
   status: "active" | "filled";
   at: number;
+  kind?: "offer" | "job";
 };
 
 export type ConstructionRepository = {
@@ -338,6 +372,9 @@ export type ConstructionRepository = {
   upsertJob(row: StoredConstructionJob): Promise<void>;
   removeJob(id: string): Promise<void>;
   subscriptionUntil(phone: string): Promise<number | null>;
+  readSubscription?(phone: string): Promise<number | null>;
+  ensureTrial?(phone: string, until: number): Promise<void>;
+  renewSubscription?(phone: string, until: number): Promise<void>;
 };
 
 let constructionRepo: ConstructionRepository | null = null;
@@ -380,13 +417,14 @@ function storedJob(row: BuilderRecord): StoredConstructionJob {
     workers: row.workers ?? 0,
     status: jobStatus(row),
     at: row.at,
+    kind: row.kind,
   };
 }
 
 function jobFromStored(row: StoredConstructionJob): BuilderRecord {
   return {
     id: row.id,
-    kind: "job",
+    kind: row.kind === "offer" ? "offer" : "job",
     name: row.name,
     phone: row.phone,
     trade: row.trade,
@@ -407,7 +445,7 @@ function jobFromStored(row: StoredConstructionJob): BuilderRecord {
 }
 
 async function saveConstructionJob(row: BuilderRecord): Promise<void> {
-  if (!constructionRepo || row.kind !== "job") return;
+  if (!constructionRepo) return;
   if (!isJobUuid(row.id)) row.id = freshJobId();
   await constructionRepo.upsertJob(storedJob(row));
 }
@@ -423,7 +461,8 @@ export async function useConstructionRepository(repo: ConstructionRepository): P
   }
   builders.length = 0;
   for (const row of remote) builders.push(jobFromStored(row));
-  for (const offer of offers) builders.push(offer);
+  const remoteIds = new Set(remote.map((row) => row.id));
+  for (const offer of offers) if (!remoteIds.has(offer.id)) builders.push(offer);
   constructionRepo = repo;
   return { count: remote.length, seeded: false };
 }
@@ -3927,12 +3966,20 @@ export function registerTripAccount(role: "rider" | "driver", name: string, phon
 
 function grantDriverTrial(driverId: string, phone: string): void {
   if (!driverId) return;
-  const has = tripPasses.some((item) => item.driverId === driverId || samePhone(item.phone, phone));
-  if (has) return;
-  tripPasses.push({
-    phone,
-    driverId,
-    until: Date.now() + TRIP_PASS_DAYS * 24 * 60 * 60 * 1000,
+  const key = phoneKey(phone);
+  const found = tripPasses.find((item) => item.driverId === driverId || samePhone(item.phone, key));
+  if (found) {
+    found.driverId = driverId;
+    found.phone = key;
+    void tripRepo?.grantPass?.(found);
+    return;
+  }
+  const row = { phone: key, driverId, until: Date.now() + TRIP_PASS_DAYS * 24 * 60 * 60 * 1000 };
+  tripPasses.push(row);
+  void tripRepo?.grantPass?.(row).then((stored) => {
+    if (!stored) return;
+    row.until = stored.until;
+    if (stored.driverId) row.driverId = stored.driverId;
   });
 }
 
@@ -4159,9 +4206,18 @@ export async function registerMaster(name: string, phone: string): Promise<Maste
   if (clean.length < 2) fail("Ismingizni yozing.");
   const key = phoneKey(phone);
   if (key.length < 9) fail("Telefon raqamini to'liq yozing.");
+  const stored = constructionRepo?.readSubscription ? await constructionRepo.readSubscription(key) : null;
+  if (stored != null) {
+    const kept = masterSubs.find((item) => samePhone(item.phone, key));
+    if (kept) kept.until = stored;
+    else masterSubs.push({ phone: key, until: stored });
+    return masterSubStatus(key);
+  }
   const found = masterSubs.find((item) => samePhone(item.phone, key));
   if (!found) {
-    masterSubs.push({ phone: key, until: Date.now() + MASTER_SUB_DAYS * 24 * 60 * 60 * 1000 });
+    const until = Date.now() + MASTER_SUB_DAYS * 24 * 60 * 60 * 1000;
+    masterSubs.push({ phone: key, until });
+    await constructionRepo?.ensureTrial?.(key, until);
   }
   return masterSubStatus(key);
 }
@@ -4172,6 +4228,7 @@ export async function startMasterSub(phone: string): Promise<MasterPass> {
   const found = masterSubs.find((item) => samePhone(item.phone, key));
   if (!found) fail("Avval usta sifatida ro'yxatdan o'ting.");
   found.until = Date.now() + MASTER_SUB_DAYS * 24 * 60 * 60 * 1000;
+  await constructionRepo?.renewSubscription?.(key, found.until);
   return masterSubStatus(key);
 }
 
@@ -4183,6 +4240,7 @@ export function rememberMasterSubscription(phone: string, until: number): void {
   const found = masterSubs.find((item) => samePhone(item.phone, key));
   if (found) found.until = until;
   else masterSubs.push({ phone: key, until });
+  void constructionRepo?.renewSubscription?.(key, until);
 }
 
 export async function listBuilders(kind?: "offer" | "job" | null, viewerPhone?: string | null): Promise<BuilderCard[]> {
@@ -4326,7 +4384,7 @@ export async function deleteBuilder(id: string, ownerPhone: string, guestToken?:
   const index = builders.findIndex((item) => item.id === id && samePhone(item.phone, phone));
   if (index < 0) fail("E'lon topilmadi.");
   const row = builders[index];
-  if (row?.kind === "job" && constructionRepo) await constructionRepo.removeJob(row.id);
+  if (row && constructionRepo) await constructionRepo.removeJob(row.id);
   builders.splice(index, 1);
 }
 
@@ -4358,6 +4416,7 @@ export function rememberTripPassUntil(driverId: string, until: number): void {
   const row = tripPasses.find((item) => item.driverId === driverId);
   if (!row) fail("Obuna topilmadi.");
   row.until = until;
+  void tripRepo?.renewPass?.(row);
 }
 
 export function startTripPass(driverKey: string): TripPass {
@@ -4368,7 +4427,12 @@ export function startTripPass(driverKey: string): TripPass {
     found.until = until;
     found.driverId = account.id;
     found.phone = account.phone;
-  } else tripPasses.push({ phone: account.phone, driverId: account.id, until });
+    void tripRepo?.renewPass?.(found);
+  } else {
+    const row = { phone: account.phone, driverId: account.id, until };
+    tripPasses.push(row);
+    void tripRepo?.renewPass?.(row);
+  }
   return tripPassStatus(account.id);
 }
 

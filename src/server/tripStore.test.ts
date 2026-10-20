@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import test from "node:test";
-import { postTrip, listTrips, updateTrip, deleteTrip, listMyTrips, registerTripAccount, requestGuestCode, revealTripPhone, rememberTripPassUntil, startTripPass, tripPassStatus, verifyGuestCode, useTripRepository, type StoredTrip, type TripRepository } from "./store";
+import { postTrip, listTrips, updateTrip, deleteTrip, listMyTrips, registerTripAccount, requestGuestCode, revealTripPhone, rememberTripPassUntil, startTripPass, tripPassStatus, verifyGuestCode, useTripRepository, type StoredDriverPass, type StoredTrip, type TripRepository } from "./store";
 import { readDevOtp } from "./sms";
 import { createRpcServer } from "./rpcHttp";
 import { tripDatabaseStatus } from "./tripDb";
@@ -43,6 +43,8 @@ test("shaharlararo e'lon jadvali anonim mijozga yopiq", () => {
   assert.match(sql, /force row level security/);
   assert.match(sql, /revoke all on table public\.eg_trip_ads from anon/);
   assert.match(sql, /revoke all on table public\.eg_trip_ads from authenticated/);
+  assert.match(sql, /create table if not exists public\.eg_driver_passes/);
+  assert.match(sql, /revoke all on table public\.eg_driver_passes from anon/);
   assert.doesNotMatch(sql, /create policy/i);
   assert.doesNotMatch(sql, /grant /i);
 });
@@ -258,6 +260,38 @@ test("haydovchi e'lon qoldiradi, narxsiz yo'lovchi kelishiladi", async () => {
   assert.equal((await listMyTrips(driver.id)).some((item) => item.id === ride.id), false);
   assert.equal((await listMyTrips(rider.id)).some((item) => item.id === ride.id), true);
   assert.equal((await listMyTrips(rider.id)).some((item) => item.id === drive.id), false);
+});
+
+test("haydovchi 30 kuni qayta ro'yxatda uzaymaydi", async () => {
+  const kept = Date.now() + 10 * 24 * 60 * 60 * 1000;
+  const passes: StoredDriverPass[] = [{ phone: "998900000091", driverId: "TG-OLD", until: kept }];
+  const repo: TripRepository = {
+    ...memoryRepo(),
+    async listPasses() {
+      return passes.map((row) => ({ ...row }));
+    },
+    async grantPass(row) {
+      const found = passes.find((item) => item.phone.slice(-9) === row.phone.slice(-9));
+      if (found) {
+        found.driverId = row.driverId;
+        return { ...found };
+      }
+      passes.push({ ...row });
+      return { ...row };
+    },
+    async renewPass(row) {
+      const found = passes.find((item) => item.phone.slice(-9) === row.phone.slice(-9));
+      if (found) Object.assign(found, row);
+      else passes.push({ ...row });
+    },
+  };
+  await useTripRepository(repo);
+  const card = registerTripAccount("driver", "Sardor", "998900000091");
+  const status = tripPassStatus(card.id);
+  assert.equal(status.active, true);
+  assert.equal(status.until, kept);
+  const again = registerTripAccount("driver", "Sardor", "+998 90 000 00 91");
+  assert.equal(tripPassStatus(again.id).until, kept);
 });
 
 test("server yopiq bo'lsa mijoz ulanolmaydi", async () => {

@@ -45,6 +45,7 @@ function asJob(row: Record<string, unknown>): StoredConstructionJob {
     workers: Number(row.workers) || 0,
     status: text(row.status) === "filled" ? "filled" : "active",
     at: Number.isFinite(created) ? created : Date.now(),
+    kind: text(row.listing_kind) === "offer" ? "offer" : "job",
   };
 }
 
@@ -65,6 +66,7 @@ export async function connectConstructionDatabase(): Promise<{ ok: true } | { ok
       reason = "construction_jobs yoki master_subscriptions yo'q. supabase/construction.sql ni SQL Editor da ishga tushiring.";
       return { ok: false, reason };
     }
+    await next.query("alter table public.construction_jobs add column if not exists listing_kind text not null default 'job'");
     pool = next;
     ready = true;
     reason = "";
@@ -86,7 +88,7 @@ export function constructionRepository(): ConstructionRepository {
       if (!pool) return [];
       const result = await pool.query(
         `select id, title, description, category, district, address, phone_number, images, status, created_at,
-                region, area, price, pay_kind, term, workers
+                region, area, price, pay_kind, term, workers, listing_kind
          from public.construction_jobs
          order by created_at desc`,
       );
@@ -97,8 +99,8 @@ export function constructionRepository(): ConstructionRepository {
       await pool.query(
         `insert into public.construction_jobs (
            id, title, description, category, district, address, phone_number, images, status, created_at,
-           region, area, price, pay_kind, term, workers
-         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+           region, area, price, pay_kind, term, workers, listing_kind
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          on conflict (id) do update set
            title = excluded.title,
            description = excluded.description,
@@ -113,7 +115,8 @@ export function constructionRepository(): ConstructionRepository {
            price = excluded.price,
            pay_kind = excluded.pay_kind,
            term = excluded.term,
-           workers = excluded.workers`,
+           workers = excluded.workers,
+           listing_kind = excluded.listing_kind`,
         [
           row.id,
           row.name,
@@ -131,6 +134,7 @@ export function constructionRepository(): ConstructionRepository {
           row.payKind,
           row.term,
           row.workers,
+          row.kind === "offer" ? "offer" : "job",
         ],
       );
     },
@@ -153,6 +157,43 @@ export function constructionRepository(): ConstructionRepository {
       );
       const until = Number(result.rows[0]?.until);
       return Number.isFinite(until) ? until : null;
+    },
+    async readSubscription(phone) {
+      if (!pool) return null;
+      const digits = phone.replace(/\D/g, "").slice(-9);
+      if (digits.length < 9) return null;
+      const result = await pool.query(
+        `select floor(extract(epoch from expires_at) * 1000) as until
+         from public.master_subscriptions
+         where right(regexp_replace(master_phone, '\\D', '', 'g'), 9) = $1
+         limit 1`,
+        [digits],
+      );
+      const until = Number(result.rows[0]?.until);
+      return Number.isFinite(until) ? until : null;
+    },
+    async ensureTrial(phone, until) {
+      if (!pool) return;
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 9) return;
+      await pool.query(
+        `insert into public.master_subscriptions (master_phone, expires_at, is_active)
+         values ($1, to_timestamp($2 / 1000.0), true)
+         on conflict (master_phone) do nothing`,
+        [digits, until],
+      );
+    },
+    async renewSubscription(phone, until) {
+      if (!pool) return;
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 9) return;
+      await pool.query(
+        `insert into public.master_subscriptions (master_phone, expires_at, is_active)
+         values ($1, to_timestamp($2 / 1000.0), true)
+         on conflict (master_phone) do update
+           set expires_at = excluded.expires_at, is_active = true`,
+        [digits, until],
+      );
     },
   };
 }

@@ -19,6 +19,7 @@ export const FEE_START_SOM = 8000;
 export const FEE_PER_KM_SOM = 3500;
 export const MAX_DROPOFFS = 3;
 export const DEMO_COURIER_DEPOSIT = 100_000;
+export const COURIER_GIFT_SOM = 50_000;
 export const MIN_CASHOUT_SOM = 10_000;
 export const CASHOUT_AMOUNTS = [20_000, 50_000, 100_000] as const;
 export const TOPUP_AMOUNTS = [50_000, 100_000, 200_000] as const;

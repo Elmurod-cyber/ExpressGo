@@ -32,5 +32,19 @@ revoke all on table public.eg_trip_ads from public;
 revoke all on table public.eg_trip_ads from anon;
 revoke all on table public.eg_trip_ads from authenticated;
 
+-- Haydovchining 30 kunlik muddati. Telefon bo'yicha bir marta yoziladi.
+create table if not exists public.eg_driver_passes (
+  phone text primary key,
+  driver_id text not null,
+  expires_at bigint not null
+);
+
+alter table public.eg_driver_passes enable row level security;
+alter table public.eg_driver_passes force row level security;
+
+revoke all on table public.eg_driver_passes from public;
+revoke all on table public.eg_driver_passes from anon;
+revoke all on table public.eg_driver_passes from authenticated;
+
 -- Siyosat yo'q. RLS yoqilganda anon va authenticated uchun bu rad etishdir.
 -- using (true) turidagi ochiq siyosat qo'shmang.

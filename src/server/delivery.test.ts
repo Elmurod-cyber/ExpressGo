@@ -137,7 +137,7 @@ test("mijoz buyurtma yaratadi va ikkinchi mijoz uni ko'ra olmaydi", async () => 
   assert.ok(order.deliveryFee >= 8000);
 });
 
-test("ro'yxatdan o'tish kuryer egizagi va depozit yaratmaydi", async () => {
+test("yangi kuryerga 50 000 hadya, yuborilgan depozit yozilmaydi", async () => {
   const repo = useTempRepo();
   const account = await registerAccount({
     role: "sender",
@@ -156,7 +156,7 @@ test("ro'yxatdan o'tish kuryer egizagi va depozit yaratmaydi", async () => {
     vehicle: "walk",
     deposit: 500000,
   });
-  assert.equal(courier.balance, 0);
+  assert.equal(courier.balance, 50_000);
 });
 
 test("SMS sozlanmasa sinov kodi 1234 qabul qilinadi", async () => {

@@ -7,6 +7,7 @@ import {
   listMyBuilders,
   postBuilder,
   registerMaster,
+  useConstructionRepository,
   rememberMasterSubscription,
   requestGuestCode,
   startMasterSub,
@@ -195,4 +196,35 @@ test("ish e'loniga 4 tagacha ixtiyoriy rasm qo'shiladi", async () => {
     }),
     /4 tadan/,
   );
+});
+
+test("usta 30 kuni qayta ro'yxatda uzaymaydi", async () => {
+  const saved = new Map<string, number>();
+  const tail = (phone: string) => phone.replace(/\D/g, "").slice(-9);
+  await useConstructionRepository({
+    async listJobs() {
+      return [];
+    },
+    async upsertJob() {},
+    async removeJob() {},
+    async subscriptionUntil(phone) {
+      const until = saved.get(tail(phone)) ?? null;
+      return until != null && until > Date.now() ? until : null;
+    },
+    async readSubscription(phone) {
+      return saved.get(tail(phone)) ?? null;
+    },
+    async ensureTrial(phone, until) {
+      const key = tail(phone);
+      if (!saved.has(key)) saved.set(key, until);
+    },
+    async renewSubscription(phone, until) {
+      saved.set(tail(phone), until);
+    },
+  });
+  const phone = "998900000166";
+  const first = await registerMaster("Tohir", phone);
+  const again = await registerMaster("Tohir", "+998 90 000 01 66");
+  assert.equal(again.until, first.until);
+  assert.equal(again.active, true);
 });

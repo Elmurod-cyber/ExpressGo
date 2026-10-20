@@ -1,4 +1,4 @@
-import type { StoredTrip, TripRepository } from "./store";
+import type { StoredDriverPass, StoredTrip, TripRepository } from "./store";
 
 type PgPool = {
   query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
@@ -61,6 +61,18 @@ export async function connectTripDatabase(): Promise<{ ok: true } | { ok: false;
     await next.query("alter table public.eg_trip_ads add column if not exists offer text not null default 'rider'");
     await next.query("alter table public.eg_trip_ads add column if not exists vehicle text not null default ''");
     await next.query("alter table public.eg_trip_ads add column if not exists photo text not null default ''");
+    await next.query(
+      `create table if not exists public.eg_driver_passes (
+         phone text primary key,
+         driver_id text not null,
+         expires_at bigint not null
+       )`,
+    );
+    await next.query("alter table public.eg_driver_passes enable row level security");
+    await next.query("alter table public.eg_driver_passes force row level security");
+    await next.query("revoke all on table public.eg_driver_passes from public");
+    await next.query("revoke all on table public.eg_driver_passes from anon");
+    await next.query("revoke all on table public.eg_driver_passes from authenticated");
     pool = next;
     ready = true;
     reason = "";
@@ -135,5 +147,38 @@ export function tripRepository(): TripRepository {
       if (!pool) throw new Error("PostgreSQL ulanmagan.");
       await pool.query("delete from public.eg_trip_ads where id = $1", [id]);
     },
+    async listPasses() {
+      if (!pool) return [];
+      const result = await pool.query("select phone, driver_id, expires_at from public.eg_driver_passes");
+      return result.rows.map(asPass);
+    },
+    async grantPass(row) {
+      if (!pool) return row;
+      const result = await pool.query(
+        `insert into public.eg_driver_passes (phone, driver_id, expires_at)
+         values ($1, $2, $3)
+         on conflict (phone) do update set driver_id = excluded.driver_id
+         returning phone, driver_id, expires_at`,
+        [row.phone, row.driverId, row.until],
+      );
+      return asPass(result.rows[0] ?? { phone: row.phone, driver_id: row.driverId, expires_at: row.until });
+    },
+    async renewPass(row) {
+      if (!pool) return;
+      await pool.query(
+        `insert into public.eg_driver_passes (phone, driver_id, expires_at)
+         values ($1, $2, $3)
+         on conflict (phone) do update set driver_id = excluded.driver_id, expires_at = excluded.expires_at`,
+        [row.phone, row.driverId, row.until],
+      );
+    },
+  };
+}
+
+function asPass(row: Record<string, unknown>): StoredDriverPass {
+  return {
+    phone: String(row.phone),
+    driverId: String(row.driver_id ?? ""),
+    until: Number(row.expires_at),
   };
 }
