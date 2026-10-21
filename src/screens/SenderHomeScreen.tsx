@@ -137,14 +137,18 @@ export function SenderApp({
   const night = useNight();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState<SenderPage>(focus ?? "home");
-  useEffect(() => {
-    if (focus) setPage(focus);
-  }, [focus]);
   const [composer, setComposer] = useState<Composer | null>(null);
   const [opened, setOpened] = useState<SenderOrder | null>(null);
   const [sent, setSent] = useState(false);
   const { orders, error, setError, load } = useSenderOrders(account?.id);
   const { inbox, markRead } = useInbox(account?.id);
+
+  useEffect(() => {
+    if (!focus) return;
+    setPage(focus);
+    setComposer(null);
+    setOpened(null);
+  }, [focus]);
 
   useEffect(() => {
     setOpened((prev) => (prev ? (orders.find((order) => order.id === prev.id) ?? null) : null));

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
-import { CityTabBar, type CityTab } from "../components/CityTabBar";
+import { CityTabBar, type CityBarTab, type CityTab } from "../components/CityTabBar";
 import { ProfilePanel } from "../components/ProfilePanel";
 import { useSession, useT } from "../context/Session";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
@@ -13,27 +13,25 @@ export function CityShell() {
   const { account } = useSession();
   const [tab, setTab] = useState<CityTab>("home");
   const [homeKey, setHomeKey] = useState(0);
-  const [chrome, setChrome] = useState(false);
-  const onChrome = useCallback((visible: boolean) => setChrome(visible), []);
 
   useEffect(() => {
     if (!account) setTab("home");
   }, [account]);
 
-  function go(next: CityTab) {
+  function go(next: CityBarTab) {
+    if (next === "chat") return;
     if (next === "home") setHomeKey((key) => key + 1);
-    setChrome(true);
     setTab(next);
   }
 
   return (
     <View className="flex-1 bg-canvas">
       <ScreenEnter key={tab}>
-        {tab === "home" ? <WelcomeScreen key={homeKey} onChrome={onChrome} onProfile={() => go("profile")} /> : null}
+        {tab === "home" ? <WelcomeScreen key={homeKey} onCityTab={go} onProfile={() => go("profile")} /> : null}
         {tab === "orders" ? <AccountOrders /> : null}
         {tab === "profile" ? <AccountProfile onCancel={() => setTab("home")} /> : null}
       </ScreenEnter>
-      {account && chrome ? <CityTabBar tab={tab} onChange={go} /> : null}
+      {account && tab !== "home" ? <CityTabBar tab={tab} onChange={go} /> : null}
     </View>
   );
 }

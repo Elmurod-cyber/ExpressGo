@@ -7,7 +7,7 @@ import { notifyLocal } from "../services/push";
 
 const empty: InboxBundle = { notes: [], unread: 0 };
 
-export function useInbox(userId?: string | null) {
+export function useInbox(userId?: string | null, quiet = false) {
   const { pushOn } = useSession();
   const [inbox, setInbox] = useState<InboxBundle>(empty);
   const seen = useRef(new Set<string>());
@@ -22,7 +22,7 @@ export function useInbox(userId?: string | null) {
     }
     try {
       const next = await api.listInbox(userId);
-      if (primed.current && pushOn && AppState.currentState === "active") {
+      if (!quiet && primed.current && pushOn && AppState.currentState === "active") {
         for (const note of next.notes) {
           if (!seen.current.has(note.id) && !note.read) {
             void notifyLocal(note.title, note.body);
@@ -35,7 +35,7 @@ export function useInbox(userId?: string | null) {
     } catch {
       // Keyingi urinishda.
     }
-  }, [userId, pushOn]);
+  }, [userId, pushOn, quiet]);
 
   useEffect(() => {
     void reload();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -21,11 +21,14 @@ import { IntercityScreen, TripEntry } from "./IntercityScreen";
 import { FoodScreen } from "../components/FoodBoard";
 import { BuildScreen } from "./BuildScreen";
 import { DeliveryEntry } from "./DeliveryEntry";
+import { CityTabBar, type CityBarTab, type CityTab } from "../components/CityTabBar";
+import { useInbox } from "../hooks/useInbox";
+import type { SenderPage } from "../components/SenderTabBar";
 
 type Gate = "sender" | "rider";
 type Feed = "all" | "jobs" | "food" | "trips" | "barber" | "builder";
 
-export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: boolean) => void; onProfile?: () => void }) {
+export function WelcomeScreen({ onCityTab, onProfile }: { onCityTab?: (tab: CityTab) => void; onProfile?: () => void }) {
   const t = useT();
   const night = useNight();
   const { account } = useSession();
@@ -41,6 +44,8 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
   const [booting, setBooting] = useState(true);
   const [detail, setDetail] = useState<{ kind: "job" | "trip"; id: string } | null>(null);
   const [tripDoor, setTripDoor] = useState<"gate" | "list">("gate");
+  const [senderFocus, setSenderFocus] = useState<SenderPage>("home");
+  const { inbox } = useInbox(account?.id, true);
 
   const load = useCallback(async () => {
     try {
@@ -101,75 +106,118 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
     if (!alive) setDetail(null);
   }, [detail, jobs, trips]);
 
-  const nestedApp = gate === "sender" && account?.role === "sender";
-  const pickingService =
-    gate !== null || feed === "food" || feed === "builder" || feed === "jobs" || (feed === "trips" && tripDoor === "gate");
+  const inDelivery = account?.role === "sender" && (feed === "jobs" || gate === "sender");
+  const barTab: CityBarTab =
+    inDelivery && (senderFocus === "orders" || senderFocus === "chat") ? senderFocus : "home";
 
-  useEffect(() => {
-    onChrome?.(Boolean(account) && !pickingService && !nestedApp);
-  }, [account, nestedApp, onChrome, pickingService]);
+  function openCity(next: CityTab) {
+    setGate(null);
+    setFeed("all");
+    setSenderFocus("home");
+    onCityTab?.(next);
+  }
+
+  function pickBar(next: CityBarTab) {
+    if (next === "home") {
+      setGate(null);
+      setFeed("all");
+      setTripDoor("gate");
+      setSenderFocus("home");
+      setDetail(null);
+      return;
+    }
+    if (next === "chat" || (next === "orders" && inDelivery)) {
+      setSenderFocus(next);
+      setGate("sender");
+      return;
+    }
+    openCity(next);
+  }
+
+  function dock(body: ReactNode, delivery = false) {
+    if (!account) return body;
+    return (
+      <View className="flex-1">
+        <View className="min-h-0 flex-1">{body}</View>
+        <CityTabBar tab={barTab} chat={delivery} unread={inbox.unread} onChange={pickBar} />
+      </View>
+    );
+  }
 
   if (gate === "sender") {
     if (account?.role === "sender") {
-      return (
+      return dock(
         <ScreenEnter>
-          <SenderApp onBack={() => setGate(null)} />
-        </ScreenEnter>
+          <SenderApp
+            showTabBar={false}
+            focus={senderFocus}
+            onBack={() => {
+              setGate(null);
+              setSenderFocus("home");
+            }}
+          />
+        </ScreenEnter>,
+        true,
       );
     }
-    return (
+    return dock(
       <ScreenEnter>
         <RegisterScreen role="sender" onBack={() => setGate(null)} />
-      </ScreenEnter>
+      </ScreenEnter>,
     );
   }
   if (gate === "rider") {
-    return (
+    return dock(
       <ScreenEnter>
         <IntercityScreen start="rider" pane="post" onBack={() => setGate(null)} />
-      </ScreenEnter>
+      </ScreenEnter>,
     );
   }
   if (feed === "trips" && tripDoor === "gate") {
-    return (
+    return dock(
       <ScreenEnter>
         <TripEntry onBack={() => setFeed("all")} onRider={() => setGate("rider")} />
-      </ScreenEnter>
+      </ScreenEnter>,
     );
   }
   if (feed === "food") {
-    return (
+    return dock(
       <ScreenEnter>
         <FoodScreen onBack={() => setFeed("all")} />
-      </ScreenEnter>
+      </ScreenEnter>,
     );
   }
   if (feed === "builder") {
-    return (
+    return dock(
       <ScreenEnter>
         <BuildScreen onBack={() => setFeed("all")} onNeedAccount={onProfile} />
-      </ScreenEnter>
+      </ScreenEnter>,
     );
   }
   if (feed === "jobs") {
-    return (
+    return dock(
       <ScreenEnter>
-      <DeliveryEntry
-        jobs={localJobs}
-        onBack={() => {
-          setDetail(null);
-          setFeed("all");
-        }}
-        onOrder={() => setGate("sender")}
-        onOpenJob={(id) => openDetail({ kind: "job", id })}
-      >
-        {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} /> : null}
-      </DeliveryEntry>
-      </ScreenEnter>
+        <DeliveryEntry
+          jobs={localJobs}
+          onBack={() => {
+            setDetail(null);
+            setFeed("all");
+            setSenderFocus("home");
+          }}
+          onOrder={() => {
+            setSenderFocus("home");
+            setGate("sender");
+          }}
+          onOpenJob={(id) => openDetail({ kind: "job", id })}
+        >
+          {pickedJob ? <JobSheet job={pickedJob} onClose={() => setDetail(null)} /> : null}
+        </DeliveryEntry>
+      </ScreenEnter>,
+      account?.role === "sender",
     );
   }
 
-  return (
+  return dock(
     <ScreenEnter>
     <Screen compact>
       <StatusBar style={night ? "light" : "dark"} />
@@ -352,7 +400,7 @@ export function WelcomeScreen({ onChrome, onProfile }: { onChrome?: (visible: bo
         {error ? <Text className="mt-2 text-sm text-[#F04438]">{error}</Text> : null}
       </View>
     </Screen>
-    </ScreenEnter>
+    </ScreenEnter>,
   );
 }
 
