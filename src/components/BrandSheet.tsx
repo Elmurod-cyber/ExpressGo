@@ -42,7 +42,7 @@ export function BrandSheet() {
             style={{
               marginTop: insets.top + 8,
               marginLeft: 0,
-              width: "86%",
+              width: "72%",
               opacity: progress,
               transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-48, 0] }) }],
             }}
