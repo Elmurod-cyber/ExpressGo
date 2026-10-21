@@ -10,8 +10,10 @@ export const MATCH_RADIUS_KM: Record<VehicleKind, number> = {
   car: 3,
   cargo: 4,
 };
-export const PING_MS = 7_000;
+export const PING_MS = 45_000;
 export const GPS_STALE_MS = 120_000;
+/** Uyqudagi telefonga xabar: oxirgi joylashuv shu muddatdan yangi bo'lsa ham yuboriladi. */
+export const PUSH_GPS_MS = 15 * 60 * 1000;
 export const MAX_PINGS = 5;
 /** OSRM yo'l vaqti bo'lmasa, taxminiy tezlik. */
 export const CITY_SPEED_KMH = 20;

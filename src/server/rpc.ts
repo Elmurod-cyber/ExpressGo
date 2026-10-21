@@ -65,8 +65,9 @@ export const RPC = {
   listSenderOrders: (_senderId: string) => delivery.listMine(requireActor()),
   listLiveJobs: () => delivery.liveJobs(),
   cancelOrder: (_senderId: string, orderId: string) => delivery.cancelDelivery(requireActor(), orderId),
-  getCourierBoard: (_courierId: string) => delivery.courierBoard(requireActor()),
-  pingLocation: (_courierId: string, lat: number, lng: number) => delivery.pingCourier(requireActor(), lat, lng),
+  getCourierBoard: (_courierId: string, awake?: boolean) => delivery.courierBoard(requireActor(), awake !== false),
+  pingLocation: (_courierId: string, lat: number, lng: number, awake?: boolean) =>
+    delivery.pingCourier(requireActor(), lat, lng, awake !== false),
   acceptOrder: (_courierId: string, orderId: string) => delivery.acceptDelivery(requireActor(), orderId),
   declineOrder: (_courierId: string, orderId: string) => delivery.declineDelivery(requireActor(), orderId),
   markPickedUp: (_courierId: string, orderId: string, _photo: string) => delivery.pickupDelivery(requireActor(), orderId),

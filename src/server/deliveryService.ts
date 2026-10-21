@@ -25,6 +25,7 @@ import {
   vehicleFits,
   GPS_STALE_MS,
   PING_MS,
+  PUSH_GPS_MS,
   matchRadiusKm,
   DOC_LABEL,
   COURIER_GIFT_SOM,
@@ -331,18 +332,55 @@ async function notifyAccount(
   }
 }
 
+const offerPushed = new Set<string>();
+
+async function pushOffer(courierId: string, order: DeliveryOrder) {
+  const key = `${courierId}:${order.id}`;
+  if (offerPushed.has(key)) return;
+  offerPushed.add(key);
+  await notifyAccount(courierId, "Yangi Buyurtma!", `${order.pickup} → ${order.dropoff}`, { orderId: order.id }, true);
+}
+
+function hearsOffers(courier: DeliveryUser, now: number): boolean {
+  return (
+    courier.role === "courier" &&
+    courier.shiftOn &&
+    Boolean(courier.vehicle) &&
+    docsApproved(courier) &&
+    courier.lat != null &&
+    courier.lng != null &&
+    courier.locationAt != null &&
+    now - courier.locationAt <= PUSH_GPS_MS
+  );
+}
+
 async function notifyOpenCouriers(order: DeliveryOrder) {
-  if (order.pickupLat == null || order.pickupLng == null) return;
+  if (order.pickupLat == null || order.pickupLng == null || order.status !== "posted" || order.courierId) return;
   const pickup = { lat: order.pickupLat, lng: order.pickupLng };
   const now = Date.now();
   for (const courier of await repo().listUsers()) {
-    if (courier.role !== "courier" || !courier.shiftOn || !courier.vehicle || !docsApproved(courier)) continue;
+    if (!hearsOffers(courier, now) || !courier.vehicle || courier.lat == null || courier.lng == null) continue;
     if (!vehicleFits(courier.vehicle, order.vehicle)) continue;
-    if (courier.lat == null || courier.lng == null || courier.locationAt == null) continue;
-    if (now - courier.locationAt > GPS_STALE_MS) continue;
+    if (order.declinedBy.includes(courier.id)) continue;
     const km = kmBetween(pickup, { lat: courier.lat, lng: courier.lng });
     if (km > matchRadiusKm(courier.vehicle)) continue;
-    await notifyAccount(courier.id, "Yangi Buyurtma!", `${order.pickup} → ${order.dropoff}`, { orderId: order.id }, true);
+    await pushOffer(courier.id, order);
+  }
+}
+
+async function announceNearby(courier: DeliveryUser) {
+  const now = Date.now();
+  if (!hearsOffers(courier, now) || !courier.vehicle || courier.lat == null || courier.lng == null) return;
+  const here = { lat: courier.lat, lng: courier.lng };
+  for (const order of await repo().listOrders()) {
+    if (order.status !== "posted" || order.courierId) continue;
+    if (order.readyAt > now) continue;
+    if (order.declinedBy.includes(courier.id)) continue;
+    if (order.pickupLat == null || order.pickupLng == null) continue;
+    if (!vehicleFits(courier.vehicle, order.vehicle)) continue;
+    const km = kmBetween({ lat: order.pickupLat, lng: order.pickupLng }, here);
+    if (km > matchRadiusKm(courier.vehicle)) continue;
+    await pushOffer(courier.id, order);
   }
 }
 
@@ -812,7 +850,7 @@ function offerDeadline(courierId: string, orderId: string): number {
   return start + PING_MS;
 }
 
-async function offerFor(courier: DeliveryUser, orders: DeliveryOrder[]): Promise<CourierOrder | null> {
+async function offerFor(courier: DeliveryUser, orders: DeliveryOrder[], awake: boolean): Promise<CourierOrder | null> {
   if (!courier.shiftOn || !courier.vehicle || !docsApproved(courier)) return null;
   if (courier.lat == null || courier.lng == null || courier.locationAt == null) return null;
   if (Date.now() - courier.locationAt > GPS_STALE_MS) return null;
@@ -833,8 +871,8 @@ async function offerFor(courier: DeliveryUser, orders: DeliveryOrder[]): Promise
     if (!best || km < best.km) best = { order, km };
   }
   if (!best) return null;
-  const until = offerDeadline(courier.id, best.order.id);
-  if (until <= Date.now()) return null;
+  const until = awake ? offerDeadline(courier.id, best.order.id) : null;
+  if (until != null && until <= Date.now()) return null;
   const view = courierView(best.order, (await nameOf(best.order.senderId)) ?? "Buyurtmachi", false);
   const low = courier.balance < best.order.commission;
   return {
@@ -1102,7 +1140,7 @@ function docsApproved(user: DeliveryUser): boolean {
   return docsNeeded(user.vehicle).every((kind) => docStatus(user, kind) === "approved");
 }
 
-export async function courierBoard(actor: Actor): Promise<CourierBoard> {
+export async function courierBoard(actor: Actor, awake = true): Promise<CourierBoard> {
   const courier = await requireCourier(actor);
   const orders = await repo().listOrders();
   const mine = orders.filter((order) => order.courierId === courier.id);
@@ -1117,7 +1155,7 @@ export async function courierBoard(actor: Actor): Promise<CourierBoard> {
     await Promise.all(waiting.map(async (order) => courierView(order, await senderName(order), false))),
     await Promise.all(completed.map(async (order) => courierView(order, await senderName(order), true))),
     boardPins(courier, orders),
-    await offerFor(courier, orders),
+    await offerFor(courier, orders, awake),
   );
 }
 
@@ -1264,7 +1302,7 @@ export async function arriveDelivery(actor: Actor, orderId: string): Promise<Cou
   return courierBoard(actor);
 }
 
-export async function pingCourier(actor: Actor, lat: number, lng: number): Promise<CourierBoard> {
+export async function pingCourier(actor: Actor, lat: number, lng: number, awake = true): Promise<CourierBoard> {
   const courier = await requireCourier(actor);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) fail("Joylashuv noto'g'ri.");
   courier.lat = lat;
@@ -1272,7 +1310,8 @@ export async function pingCourier(actor: Actor, lat: number, lng: number): Promi
   courier.locationAt = Date.now();
   courier.updatedAt = courier.locationAt;
   await repo().writeUser(courier);
-  return courierBoard(actor);
+  await announceNearby(courier);
+  return courierBoard(actor, awake);
 }
 
 export async function setCourierShift(actor: Actor, on: boolean): Promise<Account> {
@@ -1290,6 +1329,7 @@ export async function setCourierShift(actor: Actor, on: boolean): Promise<Accoun
   }
   courier.updatedAt = Date.now();
   await repo().writeUser(courier);
+  if (on) await announceNearby(courier);
   return toAccount(courier);
 }
 

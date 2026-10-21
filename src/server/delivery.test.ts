@@ -405,6 +405,115 @@ test("smenasi ochiq kuryerga yopiq ilova xabari boradi", async () => {
   }
 });
 
+test("uyqudagi joylashuv qabul vaqtini yoqmaydi", async () => {
+  const repo = useTempRepo();
+  const sender = await signIn("sender", "998900000081", "Ali");
+  const courier = await signIn("courier", "998900000082", "Karim", "walk");
+  const admin = await signIn("sender", "998900000083", "Admin");
+  const adminUser = await repo.readUser(admin.account.id);
+  assert.ok(adminUser);
+  adminUser.isAdmin = true;
+  await repo.writeUser(adminUser);
+  const adminActor = { ...actorOf(admin.account), isAdmin: true };
+  await submitDoc(actorOf(courier.account), "passport", "file://passport");
+  await reviewDoc(adminActor, courier.account.id, "passport", true);
+  await creditAsAdmin(adminActor, courier.account.id, 20000);
+  await setCourierShift(actorOf(courier.account), true);
+  await pingCourier(actorOf(courier.account), 40.71, 71.06);
+  await createDeliveryOrder(actorOf(sender.account), {
+    pickup: "Shahrixon markaz",
+    dropoff: "Bozor",
+    item: "Hujjat",
+    customerPhone: "998900000089",
+    vehicle: "walk",
+    pickupLat: 40.712,
+    pickupLng: 71.061,
+    dropoffLat: 40.72,
+    dropoffLng: 71.07,
+  });
+  const asleep = await pingCourier(actorOf(courier.account), 40.71, 71.06, false);
+  assert.equal(asleep.ping?.offeredToYou, true);
+  assert.equal(asleep.ping?.pingUntil, null);
+  const still = await pingCourier(actorOf(courier.account), 40.711, 71.061, false);
+  assert.equal(still.ping?.pingUntil, null);
+  const awake = await courierBoard(actorOf(courier.account), true);
+  assert.ok((awake.ping?.pingUntil ?? 0) > Date.now());
+  const again = await courierBoard(actorOf(courier.account), true);
+  assert.equal(again.ping?.pingUntil, awake.ping?.pingUntil);
+});
+
+test("uyqudagi va yaqinlashgan kuryerga buyurtma xabari ketadi", async () => {
+  const repo = useTempRepo();
+  const sent: { to: string; title: string }[] = [];
+  setExpoPushSender(async (items) => {
+    sent.push(...items);
+  });
+  try {
+    const sender = await signIn("sender", "998900000091", "Ali");
+    const courier = await signIn("courier", "998900000092", "Karim", "walk");
+    const admin = await signIn("sender", "998900000093", "Admin");
+    const adminUser = await repo.readUser(admin.account.id);
+    assert.ok(adminUser);
+    adminUser.isAdmin = true;
+    await repo.writeUser(adminUser);
+    const adminActor = { ...actorOf(admin.account), isAdmin: true };
+    await submitDoc(actorOf(courier.account), "passport", "file://passport");
+    await reviewDoc(adminActor, courier.account.id, "passport", true);
+    await creditAsAdmin(adminActor, courier.account.id, 20000);
+    await setCourierShift(actorOf(courier.account), true);
+    await savePushToken(actorOf(courier.account), "ExponentPushToken[near]");
+    await pingCourier(actorOf(courier.account), 41.3, 71.06, false);
+    sent.length = 0;
+    await createDeliveryOrder(actorOf(sender.account), {
+      pickup: "Shahrixon markaz",
+      dropoff: "Bozor",
+      item: "Hujjat",
+      customerPhone: "998900000099",
+      vehicle: "walk",
+      pickupLat: 40.71,
+      pickupLng: 71.06,
+      deliveryFee: 1,
+    });
+    assert.equal(sent.length, 0);
+    await pingCourier(actorOf(courier.account), 40.71, 71.06, false);
+    assert.equal(sent.filter((item) => item.title === "Yangi Buyurtma!").length, 1);
+    sent.length = 0;
+    await pingCourier(actorOf(courier.account), 40.711, 71.061, false);
+    assert.equal(sent.length, 0);
+    await pingCourier(actorOf(courier.account), 41.3, 71.06, false);
+
+    const stale = await signIn("courier", "998900000094", "Sobir", "walk");
+    await submitDoc(actorOf(stale.account), "passport", "file://passport");
+    await reviewDoc(adminActor, stale.account.id, "passport", true);
+    await creditAsAdmin(adminActor, stale.account.id, 20000);
+    await setCourierShift(actorOf(stale.account), true);
+    await savePushToken(actorOf(stale.account), "ExponentPushToken[stale]");
+    await pingCourier(actorOf(stale.account), 40.71, 71.06, false);
+    const row = await repo.readUser(stale.account.id);
+    assert.ok(row);
+    row.locationAt = Date.now() - 10 * 60 * 1000;
+    await repo.writeUser(row);
+    sent.length = 0;
+    await createDeliveryOrder(actorOf(sender.account), {
+      pickup: "Shahrixon markaz",
+      dropoff: "Bozor",
+      item: "Ovqat",
+      customerPhone: "998900000098",
+      vehicle: "walk",
+      pickupLat: 40.712,
+      pickupLng: 71.061,
+      deliveryFee: 1,
+    });
+    assert.equal(
+      sent.filter((item) => item.to === "ExponentPushToken[stale]" && item.title === "Yangi Buyurtma!").length,
+      1,
+    );
+    assert.equal(sent.filter((item) => item.to === "ExponentPushToken[near]").length, 0);
+  } finally {
+    setExpoPushSender(null);
+  }
+});
+
 test("eng ko'p yuborilgan manzil birinchi taklif qilinadi", async () => {
   useTempRepo();
   const sender = await signIn("sender", "998900000077", "Ali");
