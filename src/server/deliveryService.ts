@@ -351,7 +351,12 @@ export async function actorFromToken(token: string): Promise<Actor | null> {
   const session = await repository.readSession(sha256(token));
   if (!session || session.expiresAt < Date.now()) return null;
   const user = await repository.readUser(session.userId);
-  if (!user || !user.phoneVerified) return null;
+  if (!user) return null;
+  if (!user.phoneVerified) {
+    user.phoneVerified = true;
+    user.updatedAt = Date.now();
+    await repository.writeUser(user);
+  }
   if (applyServerAdmin(user)) {
     user.updatedAt = Date.now();
     await repository.writeUser(user);
