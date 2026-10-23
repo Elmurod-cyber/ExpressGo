@@ -12,6 +12,7 @@ import { getSessionToken } from "../services/sessionToken";
 import type { BuildProfile } from "../services/buildProfile";
 import { formatMoney } from "../services/money";
 import { formatUzPhone } from "../services/phoneMask";
+import { useNight } from "../services/theme";
 import type { BuilderCard, BuilderKind, BuilderPay, BuilderTerm } from "../types";
 
 type Side = "entry" | "hire";
@@ -267,7 +268,7 @@ function JobPhotos({ photos }: { photos: string[] }) {
               </Pressable>
             ) : null}
             <Pressable onPress={() => setNear((value) => !value)} accessibilityRole="button" className="rounded-full bg-card px-5 py-3">
-              <Text className="text-sm font-bold text-black">{near ? t("build.photo_fit") : t("build.photo_near")}</Text>
+              <Text className="text-sm font-bold text-ink">{near ? t("build.photo_fit") : t("build.photo_near")}</Text>
             </Pressable>
             {photos.length > 1 ? (
               <Pressable
@@ -291,6 +292,7 @@ function JobPhotos({ photos }: { photos: string[] }) {
 
 function AdCard({ card }: { card: BuilderCard }) {
   const t = useT();
+  const night = useNight();
   const digits = card.phone.replace(/\D/g, "");
   const place = [card.region, card.area].filter(Boolean).join(", ");
   const street = card.contactOpen && card.address && card.address !== place ? card.address : "";
@@ -298,7 +300,7 @@ function AdCard({ card }: { card: BuilderCard }) {
   const term = card.term ? t(`build.term_${card.term}`) : "";
   const meta = [term, card.workers > 0 ? t("build.workers_n", { n: card.workers }) : "", card.experience].filter(Boolean).join(" · ");
   return (
-    <View className="mt-3 rounded-3xl bg-[#F3F6E8] px-4 py-2.5">
+    <View className={`mt-3 rounded-3xl px-4 py-2.5 ${night ? "bg-card" : "bg-[#F3F6E8]"}`}>
       <Text className="text-xs font-semibold uppercase text-[#C2410C]">{card.kind === "job" ? t("build.jobs_title") : t("build.offers_title")}</Text>
       <Text className="mt-1 text-base font-bold text-ink">{tradeLabel(t, card.trade) || card.name}</Text>
       {card.name ? <Text className="mt-1 text-sm text-muted">{card.name}</Text> : null}
@@ -319,8 +321,8 @@ function AdCard({ card }: { card: BuilderCard }) {
           <Text className="ml-2 text-sm font-bold text-white">{card.phone}</Text>
         </Pressable>
       ) : (
-        <View className="mt-3 flex-row items-center self-start rounded-full bg-[#E7E5E4] px-4 py-2.5">
-          <Ionicons name="lock-closed" size={16} color="#57534E" />
+        <View className={`mt-3 flex-row items-center self-start rounded-full px-4 py-2.5 ${night ? "bg-[#3A3A3A]" : "bg-[#E7E5E4]"}`}>
+          <Ionicons name="lock-closed" size={16} color={night ? "#A3A3A3" : "#57534E"} />
           <Text className="ml-2 text-sm font-bold text-ink">{card.phone}</Text>
         </View>
       )}
@@ -577,6 +579,7 @@ function MineAds({
   onEdit: (card: BuilderCard) => void;
 }) {
   const t = useT();
+  const night = useNight();
   const [rows, setRows] = useState<BuilderCard[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -623,7 +626,7 @@ function MineAds({
       {error ? <Text className="mt-2 text-sm text-red-600">{error}</Text> : null}
       {ready && rows.length === 0 && !error ? <Text className="mt-4 text-sm text-muted">{t("build.mine_empty")}</Text> : null}
       {rows.map((card) => (
-        <View key={card.id} className="mt-3 rounded-3xl bg-[#F3F6E8] px-4 py-2.5">
+        <View key={card.id} className={`mt-3 rounded-3xl px-4 py-2.5 ${night ? "bg-card" : "bg-[#F3F6E8]"}`}>
           <Text className="text-base font-bold text-ink">{tradeLabel(t, card.trade) || card.name}</Text>
           <Text className="mt-1 text-sm text-muted">{[card.region, card.area].filter(Boolean).join(", ")}</Text>
           {card.address ? <Text className="mt-1 text-sm text-ink">{card.address}</Text> : null}

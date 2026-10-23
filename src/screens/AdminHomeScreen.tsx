@@ -25,6 +25,7 @@ import { InboxPanel } from "../components/InboxPanel";
 import { ProfilePanel } from "../components/ProfilePanel";
 import { useInbox } from "../hooks/useInbox";
 import { useSession } from "../context/Session";
+import { useNight } from "../services/theme";
 
 type AdminTab = "jobs" | "users" | "docs" | "checks" | "ads" | "sms" | "push";
 type JobView = "active" | "map";
@@ -544,6 +545,8 @@ function AdsPanel({
   onBuy: () => void;
 }) {
   const { t } = useSession();
+  const night = useNight();
+  const idleChip = night ? "bg-[#3A3A3A]" : "bg-slate-100";
   return (
     <View className="mt-4">
       <View className="rounded-3xl bg-card p-4">
@@ -577,7 +580,7 @@ function AdsPanel({
             <Pressable
               key={item}
               onPress={() => onSlot(item)}
-              className={`mb-1 mr-1 rounded-full px-3 py-2 ${slot === item ? "bg-[#121212]" : "bg-slate-100"}`}
+              className={`mb-1 mr-1 rounded-full px-3 py-2 ${slot === item ? "bg-[#121212]" : idleChip}`}
             >
               <Text className={`text-xs font-semibold ${slot === item ? "text-white" : "text-ink"}`}>
                 {AD_SLOT_LABEL[item]}
@@ -591,7 +594,7 @@ function AdsPanel({
             <Pressable
               key={item}
               onPress={() => onPlan(item)}
-              className={`mb-1 mr-1 rounded-full px-3 py-2 ${plan === item ? "bg-[#121212]" : "bg-slate-100"}`}
+              className={`mb-1 mr-1 rounded-full px-3 py-2 ${plan === item ? "bg-[#121212]" : idleChip}`}
             >
               <Text className={`text-xs font-semibold ${plan === item ? "text-white" : "text-ink"}`}>
                 {AD_PLAN_LABEL[item]} · {formatMoney(AD_PLAN_SOM[item])}
