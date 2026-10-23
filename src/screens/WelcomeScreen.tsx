@@ -269,7 +269,7 @@ export function WelcomeScreen({ onCityTab, onProfile }: { onCityTab?: (tab: City
                 <ServiceTile art={homeArt.build} label={t("city.tile_builder")} width={tile} height={tileH} onPress={() => pickFeed("builder")} />
               </View>
               <View className="mt-2 flex-row" style={{ gap: 8 }}>
-                <ServiceTile art={homeArt.bus} label={t("city.tile_trip")} width={tile} height={tileH} onPress={() => pickFeed("trips")} />
+                <ServiceTile art={homeArt.car} label={t("city.tile_trip")} width={tile} height={tileH} onPress={() => pickFeed("trips")} />
                 <ServiceTile
                   art={homeArt.scooter}
                   label={t("city.tile_delivery")}
@@ -319,7 +319,7 @@ export function WelcomeScreen({ onCityTab, onProfile }: { onCityTab?: (tab: City
                 ) : card.kind === "trip" ? (
                   <HomeAd
                     key={`trip-${card.trip.id}`}
-                    art={homeArt.bus}
+                    art={homeArt.car}
                     kicker={card.trip.offer === "driver" ? t("trip.driver") : t("trip.rider")}
                     title={`${card.trip.from} → ${card.trip.to}`}
                     body={`${card.trip.whenLabel} · ${t("trip.seats")}: ${card.trip.seats}`}
@@ -475,7 +475,7 @@ function builderMoney(t: (key: string) => string, card: BuilderCard): string {
 const homeArt = {
   scooter: require("../../assets/home/scooter.jpg"),
   food: require("../../assets/home/food.jpg"),
-  bus: require("../../assets/home/bus.jpg"),
+  car: require("../../assets/home/car.jpg"),
   build: require("../../assets/home/build.jpg"),
   barber: require("../../assets/home/barber.jpg"),
 };
