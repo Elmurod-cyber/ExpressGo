@@ -2,7 +2,7 @@ import { Image } from "react-native";
 
 const logo = require("../../assets/brand/logo.jpg");
 
-/** To'q sariq Express Go belgisi. */
+/** Express Go EG belgisi. */
 export function BrandMark({ size = 52 }: { size?: number }) {
   return (
     <Image
